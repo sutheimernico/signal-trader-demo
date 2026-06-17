@@ -28,3 +28,13 @@ def test_alpaca_keys_read_from_env(monkeypatch):
     monkeypatch.setenv("ALPACA_API_KEY", "key123")
     monkeypatch.setenv("ALPACA_API_SECRET", "secret456")
     assert config.alpaca_credentials() == ("key123", "secret456")
+
+
+def test_sec_identity_defaults_to_none_when_env_absent(monkeypatch):
+    monkeypatch.delenv("SEC_IDENTITY", raising=False)
+    assert config.sec_identity() is None
+
+
+def test_sec_identity_read_from_env(monkeypatch):
+    monkeypatch.setenv("SEC_IDENTITY", "Nico Sutheimer nico@example.com")
+    assert config.sec_identity() == "Nico Sutheimer nico@example.com"

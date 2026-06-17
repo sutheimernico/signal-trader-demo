@@ -27,3 +27,13 @@ TRADING_DAYS_PER_YEAR = 252
 def alpaca_credentials() -> tuple[str | None, str | None]:
     """Return (api_key, secret_key) from the environment, or (None, None)."""
     return os.environ.get("ALPACA_API_KEY"), os.environ.get("ALPACA_API_SECRET")
+
+
+def sec_identity() -> str | None:
+    """Return the SEC fair-access identity ('Name email') from the environment.
+
+    edgartools requires this via set_identity; SEC mandates a contactable
+    User-Agent and caps requests at ~10/s. None when unset — callers that hit
+    the network must raise rather than contact SEC anonymously.
+    """
+    return os.environ.get("SEC_IDENTITY")

@@ -6,6 +6,7 @@ requires-python = ">=3.11"
 dependencies = [
     "yfinance==1.4.1",
     "backtesting==0.6.5",
+    "edgartools==5.36.0",
     "vectorbt==1.0.0",
     "quantstats-reloaded==0.1.0",
     "alpaca-py==0.43.4",
