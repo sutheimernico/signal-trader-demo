@@ -41,8 +41,8 @@ def test_signals_are_shifted_one_bar_to_prevent_lookahead():
         dtype=float,
     )
     entries, _ = momentum_signals(close, lookback=3)
-    # the crossover happens on the close at position 4; the entry signal
-    # must appear no earlier than position 5 (acted on next bar).
+    # the SMA-above condition first holds at position 4; the state-based entry
+    # signal appears at position 5 (shifted one bar).
     first_entry = entries.idxmax() if entries.any() else None
     assert first_entry is None or entries.index.get_loc(first_entry) >= 5
 

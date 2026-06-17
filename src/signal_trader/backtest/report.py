@@ -19,11 +19,15 @@ from signal_trader.backtest.metrics import MetricsReport, compute_metrics
 
 
 def _ohlcv_from_close(close: pd.Series) -> pd.DataFrame:
+    # Flat bar: O=H=L=C so that the backtesting.py engine adds zero synthetic
+    # spread.  The CostModel's slippage parameter is the sole source of
+    # execution cost — injecting a hidden bid-ask here would contaminate the
+    # vectorbt-vs-backtesting.py artifact the report is meant to demonstrate.
     return pd.DataFrame(
         {
-            "Open": close.shift(1).fillna(close.iloc[0]),
-            "High": close * 1.001,
-            "Low": close * 0.999,
+            "Open": close,
+            "High": close,
+            "Low": close,
             "Close": close,
             "Volume": 1_000_000.0,
         }
