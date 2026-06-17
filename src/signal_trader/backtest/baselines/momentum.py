@@ -26,6 +26,11 @@ def momentum_signals(
     above = close > sma
     entries = above.shift(1, fill_value=False).fillna(False).astype(bool)
     exits = (~above).shift(1, fill_value=False).fillna(False).astype(bool)
+    # Mask warmup window: SMA is NaN for the first `lookback` bars, so both
+    # `above` and `~above` collapse to False/True in a semantically undefined
+    # way.  Force them silent so no consumer sees spurious warmup signals.
+    entries.iloc[:lookback] = False
+    exits.iloc[:lookback] = False
     entries.index = close.index
     exits.index = close.index
     return entries, exits

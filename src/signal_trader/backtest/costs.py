@@ -27,7 +27,12 @@ class CostModel:
         return 2 * (self.commission_per_trade + self.slippage)
 
     def fill_price(self, mid_price: float, side: str) -> float:
-        """Slippage-adjusted fill: buys fill higher, sells lower."""
+        """Slippage-adjusted fill: buys fill higher, sells lower.
+
+        Reference helper for manual cost reasoning (e.g. break-even analysis).
+        Neither engine calls this — each applies costs via its own API
+        (backtesting.py ``spread``, vectorbt ``fees``/``slippage``).
+        """
         if side == "buy":
             return mid_price * (1 + self.slippage)
         if side == "sell":

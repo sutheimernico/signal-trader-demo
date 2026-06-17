@@ -51,3 +51,20 @@ def test_lookback_must_be_positive():
     close = pd.Series([1.0, 2.0, 3.0])
     with pytest.raises(ValueError):
         momentum_signals(close, lookback=0)
+
+
+def test_no_signal_during_warmup_entries_and_exits():
+    """Warmup bars must not produce any entries OR exits.
+
+    During the first `lookback` bars the SMA is NaN, so both conditions are
+    semantically undefined.  Before the fix, ~above (NaN -> False) was True,
+    producing spurious exits in the warmup window.
+    """
+    lookback = 20
+    close = pd.Series(
+        np.linspace(100, 120, 60),
+        index=pd.date_range("2020-01-01", periods=60, freq="B"),
+    )
+    entries, exits = momentum_signals(close, lookback=lookback)
+    assert not entries.iloc[:lookback].any(), "entries fired during warmup"
+    assert not exits.iloc[:lookback].any(), "exits fired during warmup"
