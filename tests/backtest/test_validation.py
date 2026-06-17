@@ -23,28 +23,42 @@ def test_oos_split_is_chronological_and_disjoint():
     assert round(len(oos) / len(close), 1) == 0.3
 
 
+def test_shift_test_flags_leaky_signal():
+    # leaky: signal is the sign of the SAME-bar return (contemporaneous peek).
+    # baseline (sign(r) * r == abs(r)) has a huge Sharpe; lagging the signal
+    # one bar destroys the edge -> collapsed.
+    rng = np.random.default_rng(11)
+    returns = pd.Series(rng.normal(0.0003, 0.012, 500))
+    signal = np.sign(returns)
+
+    res = shift_test(signal, returns, lag=1)
+
+    assert res["collapsed"] is True
+    assert res["baseline"] > 10.0
+
+
+def test_shift_test_passes_clean_signal():
+    # clean: momentum position computed from PAST prices only. Lagging the
+    # already-lagged position one more bar degrades only modestly on a
+    # trending series -> not collapsed.
+    rng = np.random.default_rng(13)
+    close = pd.Series(100 * np.exp(rng.normal(0.0008, 0.01, 500).cumsum()))
+    returns = close.pct_change().fillna(0.0)
+    position = (close > close.rolling(20).mean()).shift(1).astype(float)
+
+    res = shift_test(position, returns, lag=1)
+
+    assert res["collapsed"] is False
+
+
 def test_shift_test_returns_both_sharpes_and_a_collapse_flag():
-    close = _close()
+    rng = np.random.default_rng(7)
+    returns = pd.Series(rng.normal(0.0004, 0.01, 400))
+    signal = pd.Series(1.0, index=returns.index)
 
-    def run(series):
-        # toy metric that depends on a one-bar-ahead relationship
-        return float(series.pct_change().mean())
-
-    res = shift_test(close, run, lag=1)
+    res = shift_test(signal, returns, lag=1)
     assert set(res) == {"baseline", "shifted", "collapsed"}
     assert isinstance(res["collapsed"], bool)
-
-
-def test_shift_test_flags_leakage_when_shifting_destroys_performance():
-    close = _close()
-
-    # leaky metric: peeks at NEXT bar's return (perfect foresight)
-    def leaky(series):
-        return float(series.pct_change().shift(-1).fillna(0).abs().mean())
-
-    res = shift_test(close, leaky, lag=1)
-    # shifting all inputs by one bar must change the leaky result
-    assert res["baseline"] != res["shifted"]
 
 
 def test_anchored_walk_forward_windows_expand_and_are_ordered():
@@ -64,3 +78,11 @@ def test_oos_fraction_bounds_validated():
         oos_split(_close(), oos_fraction=0.0)
     with pytest.raises(ValueError):
         oos_split(_close(), oos_fraction=1.0)
+
+
+def test_oos_split_rejects_unsorted_index():
+    # A reversed index would silently produce OOS dates earlier than IS.
+    close = _close()[::-1]
+    assert not close.index.is_monotonic_increasing
+    with pytest.raises(ValueError):
+        oos_split(close)

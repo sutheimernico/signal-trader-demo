@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pytest
 
 from signal_trader.backtest.benchmark import buy_and_hold_equity
 from signal_trader.backtest.costs import CostModel
@@ -33,3 +34,19 @@ def test_equity_aligned_to_price_index():
     )
     eq = buy_and_hold_equity(close, CostModel(0.001, 0.0))
     assert eq.index.equals(close.index)
+
+
+def test_commission_charged_on_invested_notional():
+    # Engines charge commission on the traded notional, not on gross cash.
+    # So shares satisfy: shares * entry_price * (1 + commission) == init_cash.
+    close = pd.Series(
+        [100.0, 100.0],
+        index=pd.date_range("2020-01-01", periods=2, freq="B"),
+    )
+    commission = 0.01
+    init_cash = 1000.0
+    eq = buy_and_hold_equity(
+        close, CostModel(commission, 0.0), init_cash=init_cash
+    )
+    expected_shares = init_cash / (100.0 * (1 + commission))
+    assert eq.iloc[0] == pytest.approx(expected_shares * 100.0)
