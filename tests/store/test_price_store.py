@@ -38,3 +38,43 @@ def test_cached_tickers_reports_coverage(tmp_path):
     store = PriceBarStore(tmp_path / "t.sqlite")
     store.upsert_bars(_bars())
     assert store.cached_tickers() == {"AAPL"}
+
+
+# Fix 3: fetched_at must be preserved on re-upsert
+def test_upsert_preserves_fetched_at_on_re_upsert(tmp_path):
+    import sqlite3
+
+    store = PriceBarStore(tmp_path / "t.sqlite")
+    store.upsert_bars(_bars())
+
+    # Overwrite fetched_at with a known sentinel so timing cannot hide the bug
+    sentinel = "2000-01-01 00:00:00"
+    with sqlite3.connect(tmp_path / "t.sqlite") as con:
+        con.execute("UPDATE price_bars SET fetched_at = ?", (sentinel,))
+
+    # Re-upsert same (ticker, date) with a different close value
+    updated = _bars().copy()
+    updated["close"] = [999.0, 999.0]
+    store.upsert_bars(updated)
+
+    with sqlite3.connect(tmp_path / "t.sqlite") as con:
+        new_fetched_at, new_close = con.execute(
+            "SELECT fetched_at, close FROM price_bars WHERE ticker='AAPL' AND date='2020-01-02'"
+        ).fetchone()
+
+    assert new_close == 999.0, "close must be updated on re-upsert"
+    assert new_fetched_at == sentinel, "fetched_at must not change on re-upsert"
+
+
+# Fix 1 helper: covers() method
+def test_covers_returns_true_only_when_range_is_fully_stored(tmp_path):
+    store = PriceBarStore(tmp_path / "t.sqlite")
+    # Nothing stored yet
+    assert store.covers("AAPL", "2020-01-02", "2020-01-03") is False
+
+    store.upsert_bars(_bars())  # dates: 2020-01-02, 2020-01-03
+    assert store.covers("AAPL", "2020-01-02", "2020-01-03") is True
+    # Wider end date not covered
+    assert store.covers("AAPL", "2020-01-02", "2020-01-10") is False
+    # Earlier start date not covered
+    assert store.covers("AAPL", "2020-01-01", "2020-01-03") is False

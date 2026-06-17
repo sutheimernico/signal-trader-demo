@@ -49,9 +49,12 @@ class PriceBarStore:
         ]
         with self._connect() as con:
             con.executemany(
-                "INSERT OR REPLACE INTO price_bars "
+                "INSERT INTO price_bars "
                 "(ticker, date, open, high, low, close, volume, source) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT(ticker, date) DO UPDATE SET "
+                "open=excluded.open, high=excluded.high, low=excluded.low, "
+                "close=excluded.close, volume=excluded.volume, source=excluded.source",
                 records,
             )
 
@@ -71,3 +74,19 @@ class PriceBarStore:
         with self._connect() as con:
             rows = con.execute("SELECT DISTINCT ticker FROM price_bars").fetchall()
         return {r[0] for r in rows}
+
+    def covers(self, ticker: str, start: str, end: str) -> bool:
+        """Return True when the stored rows for *ticker* fully span [start, end].
+
+        Uses min/max of the stored dates so partial fills (e.g. from a previous
+        narrow backfill) are correctly detected as insufficient.
+        """
+        with self._connect() as con:
+            row = con.execute(
+                "SELECT MIN(date), MAX(date) FROM price_bars WHERE ticker = ?",
+                (ticker,),
+            ).fetchone()
+        if row is None or row[0] is None:
+            return False
+        stored_min, stored_max = row
+        return stored_min <= start and stored_max >= end
