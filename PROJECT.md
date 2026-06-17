@@ -1,0 +1,66 @@
+# Signal-Trader-Demo — Project (Source of Truth)
+
+**Stand:** 2026-06-17 · **Status:** Phase 0 (Scaffold) → Phase 1 (Fundament)
+Persönliche Regeln (`~/.claude/CLAUDE.md`) gelten. Design-Tiefe & Belege: `docs/superpowers/specs/2026-06-17-signal-trader-demo-design.md`. Arbeitsweise: `CLAUDE.md`. Codebase-Operatives: `AGENTS.md`.
+
+---
+
+# Part I — Specification
+
+## 1 · Vision & non-negotiables
+Lokale, kostenfreie, **paper-only** Backtest- und Paper-Trading-Plattform. Zwei Spuren: (1) langfristiges Vorschlagsystem aus öffentlichen Signalen (Nutzer entscheidet final), (2) abgegrenztes ML-Experiment. **Das Deliverable ist ein ehrliches Mess-Harness, kein Edge-Versprechen** — die Faktenlage (Spec §3) lässt für Retail nichts anderes zu. Forward-Paper ist Plumbing-Validierung, kein Performance-Beleg.
+
+## 2 · Architektur
+Fünf Schichten: Data → Signal → Strategy → Sim (Backtest + Alpaca Paper) → Interface (Dashboard). v1 zündet Data + Sim (Backtest) + Interface-Stub. Repo-Struktur und Mapping: Spec §10 / `AGENTS.md`.
+
+## 3 · Scope
+**Drin:** Marktdaten-Anbindung (S&P 500, Tagesdaten, gecacht), Backtest-Engine(s) mit Kosten/Slippage, Baseline, Walk-forward/OOS + Shift-Test, Metriken gegen Benchmark nach Kosten, Persistenz, Alpaca-Paper-Stub. Später: Insider-Signale, Dashboard, voller Paper-Loop, ML-Experiment.
+**Draußen:** Echtgeld, vollautonome Ausführung in Spur 1, bezahlte Feeds, News-Scalping, Nicht-US-Märkte (v1), DE/EU-Politiker-Trades (keine Daten), LLM-Kursprognose.
+
+## 4 · Datenmodell
+`Signal`, `Suggestion`, `SourceScore`, `PaperTrade`, `PriceBar` — Felder siehe Spec §9. Kernprinzip: jedes Signal mit `timestamp_event` **und** `timestamp_known` + Kurs.
+
+## 5 · Tech-Stack
+Python · SQLite + Parquet-Cache · yfinance (hinter Provider-Seam, Tiingo-Upgrade später) · vectorbt + backtesting.py · quantstats-reloaded + eigene PSR · alpaca-py (paper) · FastAPI + React 19 (Phase 3) · LightGBM/Qlib (Phase 4). Begründungen: Spec §6.
+
+## 6 · Acceptance criteria
+1. Kosten + Slippage standardmäßig im Backtest.
+2. Jedes Signal mit `event`/`known`-Zeit + Kurs protokolliert.
+3. Trefferquote je Quelle aus echten Folge-Ergebnissen, im Dashboard sichtbar.
+4. Datenverzug je Quelle sichtbar.
+5. Walk-forward/OOS für jede Evaluierung; Leakage per Shift-Test geprüft.
+6. Performance immer gegen Benchmark **nach Kosten**; nie Sharpe allein (Sortino + Calmar + PSR).
+7. Vollständig kostenfreie Datenquellen.
+8. In Spur 1 entscheidet der Nutzer final.
+9. Daten-Caveats dokumentiert (Spec §11).
+10. Forward-Run als Plumbing-Validierung ausgewiesen.
+
+---
+
+# Part II — Plan & working method
+
+## Roadmap
+- **Phase 0 — Scaffold:** Repo/Struktur/Doku/Agents/Skills, `pyproject`/Deps gepinnt, Open Inputs.
+- **Phase 1 — Fundament:** Daten-Cache, vectorbt + backtesting.py mit Kosten/Slippage + Break-even-Check, Momentum-Baseline, Shift-Test + OOS + Walk-forward, Metriken + Benchmark + PSR, Persistenz, Alpaca-Paper-Stub. **← Einstieg.**
+- **Phase 2 — Spur 1 (Insider):** Form 4 via edgartools, Filter (opportunistic + „P" + Cluster + Small-Cap), Konsolidierung, Signal-Logging, Trefferquoten. 13F als Übungs-Dataset.
+- **Phase 3 — Dashboard + Forward-Paper:** Signalkarten, Nutzerentscheidung, Trefferquoten, Datenverzug; voller Alpaca-Paper-Loop.
+- **Phase 4 — Spur 2 (ML):** Cross-sectional Ranking / Vol-/Regime-Forecast; muss Baseline + naive Referenz unter purged/embargoed-Validierung nach Kosten schlagen.
+
+## Working method
+Superpowers-Flow (`brainstorming → writing-plans → executing/subagent-driven → verification-before-completion`). Zyklus-Gate je Phase: Umsetzung → Messung/Verifikation → kurzer Report → Nico-Freigabe → nächste Phase. Self-Review iterativ pro Arbeitsschritt. Details: `CLAUDE.md`.
+
+## §Decisions (register — closed, dated)
+- **2026-06-17** Start mit **Fundament zuerst** (nicht beide Spuren parallel, nicht ML zuerst).
+- **2026-06-17** v1-Tiefe: **Backtest komplett, Alpaca-Live nur Stub**.
+- **2026-06-17** Universum: **S&P 500, Tagesdaten**.
+- **2026-06-17** Datenquelle v1: **yfinance hinter Provider-Seam**; Tiingo dokumentiertes Upgrade.
+- **2026-06-17** Backtest: **zwei Engines** (vectorbt + backtesting.py); backtrader verworfen.
+- **2026-06-17** DB: **SQLite** statt PostgreSQL.
+- **2026-06-17** **Kein ML, keine LLMs in v1**; ML als abgegrenztes Phase-4-Experiment (GBDT-Default).
+- **2026-06-17** Repo: Domänen-Layout als `src/`-Package; Doku **committed** (portfolio-Stil).
+
+## §Open inputs (living — external facts Nico owns)
+- [ ] Alpaca Paper-Account + API-Keys (→ `.env`).
+- [ ] SEC-User-Agent-Kontakt für edgartools (Name + E-Mail).
+- [ ] Optional: Tiingo Free API-Key (Daten-Upgrade).
+- [ ] Git: Remote/Visibility (privat?) — vor erstem Push klären.
