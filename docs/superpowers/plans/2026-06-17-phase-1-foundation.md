@@ -2096,3 +2096,32 @@ if __name__ == "__main__":
 - /home/nicosutheimer/private/signal-trader-demo/src/signal_trader/backtest/metrics.py
 - /home/nicosutheimer/private/signal-trader-demo/src/signal_trader/store/cache_service.py
 - /home/nicosutheimer/private/signal-trader-demo/src/signal_trader/backtest/report.py
+
+---
+
+## Implementation Notes / Outcome (2026-06-17)
+
+**Status: Phase 1 complete.** All 13 tasks (T0–T12) implemented TDD-first, subagent-driven, on branch `feat/phase-1-foundation`. Final state: **71 tests pass**, `ruff` clean, end-to-end live smoke (AAPL 2020–2024) renders the foundation report.
+
+**Live smoke result (honest finding):** the momentum baseline *underperforms* buy-and-hold after costs — exactly what the harness exists to surface.
+
+| | CAGR | Sharpe | Sortino | Calmar | MaxDD | PSR |
+|---|---|---|---|---|---|---|
+| backtesting.py | 0.150 | 0.831 | 1.231 | 0.504 | -0.298 | 0.996 |
+| vectorbt | 0.146 | 0.810 | 1.199 | 0.482 | -0.303 | 0.995 |
+| Buy & Hold (after costs) | 0.277 | 0.987 | 1.459 | 0.719 | -0.385 | 0.999 |
+
+The vectorbt-vs-backtesting.py Sharpe gap was small and **data-dependent** (slightly negative here) — the realism gap is real but not guaranteed in the "vectorized looks better" direction. (Numbers predate the `bf7bef6` flat-bar fix, which slightly narrows the gap; qualitative result unchanged.)
+
+**Two methodology gates caught real invalidating bugs** (the point of the rigor):
+- The original **shift-test was a no-op** (lagged the whole price series → couldn't detect same-series lookahead). Redesigned to lag the signal relative to its returns; now proven both ways (leaky `sign(returns)` → `collapsed=True`; clean momentum → `collapsed=False`). Commit `8eadaf0`.
+- **CAGR/Calmar were understated ~29%** (`qs.stats.cagr` used calendar-days/252). Replaced with trading-year compounding. Commit `8eadaf0`.
+- Also fixed in review: range-aware cache (no silent truncation), `load_close_matrix` raises on missing tickers, `fetched_at` preserved, warmup-exit masking, cross-engine trade-count parity test, hidden synthetic spread removed.
+
+**Deviations from the plan (all noted in commits):**
+- Momentum baseline is **state-based** (in-position while above SMA), not crossover — the plan's crossover code contradicted its own tests. One-bar leakage shift identical.
+- `quantstats-reloaded` 0.1.0 lacks `cagr(periods=)` / `sharpe(annualize=)` — adapted to real signatures; CAGR/Calmar computed manually.
+- The reviewer-claimed PSR sqrt-of-negative is mathematically unreachable from valid sample moments (Pearson bound) — guard kept as defensive engineering, not a real trigger.
+- SQLite `PriceBar` collapses `adj_close` into `close` (yfinance `auto_adjust`); add a nullable `adj_close` column when upgrading to Tiingo.
+
+**Open items carried to later phases:** surface data-lag/hit-rate in UI (Phase 3); expose walk-forward params in the CLI; `adj_close` column for the Tiingo upgrade; Alpaca/SEC credentials in `.env` (Open Inputs in `PROJECT.md`).
