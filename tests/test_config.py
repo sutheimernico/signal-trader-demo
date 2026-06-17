@@ -19,12 +19,12 @@ def test_config_paths_are_absolute_and_under_repo():
 
 def test_alpaca_keys_default_to_none_when_env_absent(monkeypatch):
     monkeypatch.delenv("ALPACA_API_KEY", raising=False)
-    monkeypatch.delenv("ALPACA_SECRET_KEY", raising=False)
+    monkeypatch.delenv("ALPACA_API_SECRET", raising=False)
     creds = config.alpaca_credentials()
     assert creds == (None, None)
 
 
 def test_alpaca_keys_read_from_env(monkeypatch):
     monkeypatch.setenv("ALPACA_API_KEY", "key123")
-    monkeypatch.setenv("ALPACA_SECRET_KEY", "secret456")
+    monkeypatch.setenv("ALPACA_API_SECRET", "secret456")
     assert config.alpaca_credentials() == ("key123", "secret456")
