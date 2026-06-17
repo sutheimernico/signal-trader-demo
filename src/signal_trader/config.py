@@ -26,4 +26,4 @@ TRADING_DAYS_PER_YEAR = 252
 
 def alpaca_credentials() -> tuple[str | None, str | None]:
     """Return (api_key, secret_key) from the environment, or (None, None)."""
-    return os.environ.get("ALPACA_API_KEY"), os.environ.get("ALPACA_SECRET_KEY")
+    return os.environ.get("ALPACA_API_KEY"), os.environ.get("ALPACA_API_SECRET")
