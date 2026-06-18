@@ -1,4 +1,5 @@
 import datetime as dt
+import sqlite3
 
 import pytest
 
@@ -53,8 +54,8 @@ def test_close_trade_records_exit_and_pnl(tmp_path):
 
 def test_read_open_trades_only(tmp_path):
     store = PaperTradeStore(tmp_path / "t.sqlite")
-    open_id = store.insert_trade(_rec(ticker="AAPL"))
-    closed_id = store.insert_trade(_rec(ticker="MSFT"))
+    open_id = store.insert_trade(_rec(ticker="AAPL", source_suggestion_id="AAPL|1"))
+    closed_id = store.insert_trade(_rec(ticker="MSFT", source_suggestion_id="MSFT|1"))
     store.close_trade(
         closed_id, exit_price=200.0,
         exit_time=dt.datetime(2024, 1, 20, 14, 30), pnl=50.0,
@@ -80,3 +81,10 @@ def test_close_unknown_id_raises(tmp_path):
     with pytest.raises(ValueError):
         store.close_trade(999, exit_price=1.0,
                           exit_time=dt.datetime(2024, 1, 1, 0, 0), pnl=0.0)
+
+
+def test_duplicate_source_suggestion_id_rejected(tmp_path):
+    store = PaperTradeStore(tmp_path / "t.sqlite")
+    store.insert_trade(_rec(source_suggestion_id="AAPL|2024-01-12"))
+    with pytest.raises(sqlite3.IntegrityError):  # UNIQUE backstop against double-open
+        store.insert_trade(_rec(source_suggestion_id="AAPL|2024-01-12"))

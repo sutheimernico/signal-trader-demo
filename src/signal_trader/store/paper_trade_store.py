@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS paper_trades (
     exit_price           REAL,
     exit_time            TEXT,
     pnl                  REAL,
-    source_suggestion_id TEXT NOT NULL
+    source_suggestion_id TEXT NOT NULL UNIQUE
 );
 """
 
