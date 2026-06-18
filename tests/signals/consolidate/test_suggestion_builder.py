@@ -49,3 +49,21 @@ def test_no_signals_yields_no_suggestions(tmp_path):
     sug_store = SuggestionStore(tmp_path / "t.sqlite")
     assert build_suggestions(sig_store, sug_store, source="insider_form4") == 0
     assert sug_store.read_suggestions() == []
+
+
+def test_suggestion_surfaces_source_links(tmp_path):
+    import json as _json
+    sig_store = SignalStore(tmp_path / "t.sqlite")
+    sug_store = SuggestionStore(tmp_path / "t.sqlite")
+    sig_store.insert_signals([SignalRecord(
+        ticker="KEY", source="insider_form4",
+        signal_type="insider_cluster_purchase", direction="long",
+        timestamp_event=dt.date(2023, 5, 1), timestamp_known=dt.date(2023, 5, 4),
+        price_at_known=10.0,
+        raw_payload={"accession_no": "a", "sources": ["https://sec.gov/x", "https://sec.gov/y"]},
+        confidence=0.6,
+    )])
+    build_suggestions(sig_store, sug_store, source="insider_form4")
+    s = sug_store.read_suggestions()[0]
+    cs = _json.loads(s.contributing_signals_json)
+    assert cs["sources"] == ["https://sec.gov/x", "https://sec.gov/y"]

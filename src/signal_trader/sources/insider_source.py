@@ -26,6 +26,7 @@ class InsiderObservation:
     timestamp_known: dt.date  # filing date (point-in-time)
     is_10b5_1: bool
     accession_no: str
+    url: str = ""  # public SEC EDGAR filing URL (source of record), if known
 
     def __post_init__(self) -> None:
         if self.timestamp_known < self.timestamp_event:

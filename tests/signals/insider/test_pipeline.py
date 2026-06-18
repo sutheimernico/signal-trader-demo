@@ -137,3 +137,23 @@ def test_no_max_price_passes_all_observations_through(tmp_path):
     tickers = {r.ticker for r in store.read_signals(source="insider_form4")}
     assert "AAPL" in tickers
     assert "MSFT" in tickers
+
+
+def test_cluster_signal_carries_source_links(tmp_path):
+    import json as _json
+    url = "https://www.sec.gov/Archives/edgar/data/1/x-index.html"
+    obs = [
+        _obs("A", "AAPL", 1), _obs("B", "AAPL", 2), _obs("C", "AAPL", 3),
+    ]
+    obs = [
+        InsiderObservation(**{**o.__dict__, "url": f"{url}?{o.reporting_owner}"})
+        for o in obs
+    ]
+    store = SignalStore(tmp_path / "t.sqlite")
+    build_insider_signals(
+        FakeSource(obs), ["AAPL"], "2024-01-01", "2024-01-31",
+        close_lookup=_close_lookup(), store=store, window_days=10, min_insiders=3,
+    )
+    payload = _json.loads(store.read_signals(source="insider_form4")[0].raw_payload_json)
+    assert len(payload["sources"]) == 3
+    assert all(s.startswith(url) for s in payload["sources"])

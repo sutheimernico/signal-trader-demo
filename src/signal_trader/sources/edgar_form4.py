@@ -96,6 +96,8 @@ class EdgarForm4Source:
         owner = str(obj.insider_name)
         role = str(obj.position)
         is_plan = _is_10b5_1(obj)
+        # Human-readable EDGAR index page = the source of record for this filing.
+        url = str(getattr(filing, "homepage_url", "") or getattr(filing, "filing_url", "") or "")
         out: list[InsiderObservation] = []
         for row in trades.itertuples(index=False):
             out.append(
@@ -111,6 +113,7 @@ class EdgarForm4Source:
                     timestamp_known=known,
                     is_10b5_1=is_plan,
                     accession_no=str(filing.accession_no),
+                    url=url,
                 )
             )
         return out

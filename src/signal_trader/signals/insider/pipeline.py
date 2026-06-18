@@ -78,6 +78,11 @@ def build_insider_signals(
                     "accession_no": cluster.members[-1].accession_no,
                     "n_insiders": cluster.n_insiders,
                     "owners": sorted({m.reporting_owner for m in cluster.members}),
+                    # Source links: the EDGAR filing page for each contributing
+                    # insider, so a suggestion is auditable back to SEC.
+                    "sources": sorted(
+                        {m.url for m in cluster.members if m.url}
+                    ),
                 },
                 confidence=min(1.0, cluster.n_insiders / 5.0),
             )

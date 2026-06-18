@@ -13,7 +13,11 @@ export type Decision = "accepted" | "rejected";
 export interface Suggestion {
   ticker: string;
   consolidated_score: number;
-  contributing_signals: { source: string; n_contributing: number };
+  contributing_signals: {
+    source: string;
+    n_contributing: number;
+    sources?: string[]; // EDGAR filing links (source of record)
+  };
   created_at: string;
   latest_known: string;
   horizon: string;

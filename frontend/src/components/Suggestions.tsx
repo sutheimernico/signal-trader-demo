@@ -116,6 +116,22 @@ export function Suggestions({
                   {s.contributing_signals.n_contributing > 1 ? "s" : ""} clustered.
                   Insiders file 2–3 days after they trade — the pre-filing move is
                   gone; this is the residual only.
+                  {s.contributing_signals.sources &&
+                    s.contributing_signals.sources.length > 0 && (
+                      <span className="sources">
+                        SEC source:{" "}
+                        {s.contributing_signals.sources.map((u, j) => (
+                          <a
+                            key={u}
+                            href={u}
+                            target="_blank"
+                            rel="noreferrer noopener"
+                          >
+                            filing {j + 1}
+                          </a>
+                        ))}
+                      </span>
+                    )}
                 </div>
                 <div className="card-foot">
                   <div className="asof">

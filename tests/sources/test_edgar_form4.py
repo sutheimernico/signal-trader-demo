@@ -151,3 +151,14 @@ def test_empty_market_trades_is_clean_skip_no_warning(caplog):
             out = EdgarForm4Source(identity="X y@z.com").fetch(["AAPL"], "2024-01-01", "2024-01-31")
     assert out == []
     assert not any(r.levelno >= logging.WARNING for r in caplog.records)
+
+
+def test_observation_carries_edgar_source_url():
+    f = _filing(_form4_obj())
+    f.homepage_url = "https://www.sec.gov/Archives/edgar/data/1/0001-index.html"
+    with patch("signal_trader.sources.edgar_form4.set_identity"), patch(
+        "signal_trader.sources.edgar_form4.Company",
+        return_value=_patched_company([f]),
+    ):
+        out = EdgarForm4Source(identity="X y@z.com").fetch(["AAPL"], "2024-01-01", "2024-01-31")
+    assert out[0].url == "https://www.sec.gov/Archives/edgar/data/1/0001-index.html"
