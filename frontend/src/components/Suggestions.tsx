@@ -111,11 +111,25 @@ export function Suggestions({
                   </div>
                 </div>
                 <div className="meta">
-                  <span className="src">{s.contributing_signals.source}</span> ·{" "}
-                  {s.contributing_signals.n_insiders ??
-                    s.contributing_signals.n_contributing}{" "}
-                  insiders bought (clustered). Insiders file 2–3 days after they
-                  trade — the pre-filing move is gone; this is the residual only.
+                  {(() => {
+                    const is13f = s.contributing_signals.source.includes("13f");
+                    const label = is13f
+                      ? "superinvestor 13F"
+                      : s.contributing_signals.source;
+                    const noun = is13f ? "famous funds" : "insiders";
+                    const lag = is13f
+                      ? "13F is filed ~45 days after quarter end — a known lag, not pre-news."
+                      : "Insiders file 2–3 days after they trade — the pre-filing move is gone; this is the residual only.";
+                    const count =
+                      s.contributing_signals.n_insiders ??
+                      s.contributing_signals.n_contributing;
+                    return (
+                      <>
+                        <span className="src">{label}</span> · {count} {noun} bought
+                        (consensus). {lag}
+                      </>
+                    );
+                  })()}
                   {s.contributing_signals.insiders &&
                     s.contributing_signals.insiders.length > 0 && (
                       <span className="insiders">

@@ -66,8 +66,12 @@ def main() -> None:
     close_lookup = _load_close_lookup(consensus, args.start, args.end)
     store = SignalStore(config.SQLITE_PATH)
     n = persist_13f_signals(observations, close_lookup, store)
-    build_suggestions(store, SuggestionStore(config.SQLITE_PATH), source=SOURCE_NAME)
-    print(f"Persisted {n} 13F signal(s) into {config.SQLITE_PATH}")
+    # Only consensus (>=2 funds) becomes a dashboard suggestion; single-fund
+    # buys stay as recorded signals but don't flood the board.
+    n_sug = build_suggestions(
+        store, SuggestionStore(config.SQLITE_PATH), source=SOURCE_NAME, min_buyers=2
+    )
+    print(f"Persisted {n} 13F signal(s); {n_sug} consensus suggestion(s)")
 
 
 if __name__ == "__main__":

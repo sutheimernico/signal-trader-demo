@@ -23,8 +23,14 @@ def build_suggestions(
     start: str | None = None,
     end: str | None = None,
     horizon: str = "long",
+    min_buyers: int = 1,
 ) -> int:
-    """Consolidate stored signals into open Suggestions. Returns count written."""
+    """Consolidate stored signals into open Suggestions. Returns count written.
+
+    min_buyers: only suggest tickers bought by >= this many distinct buyers
+    (insiders / funds). Used to keep weak single-fund 13F buys out of the
+    dashboard while still recording them as signals.
+    """
     signals = signal_store.read_signals(source=source, start=start, end=end)
     consolidated = consolidate_per_ticker(signals)
     payload_by_ticker = _payload_by_ticker(signals)
@@ -46,6 +52,10 @@ def build_suggestions(
             horizon=horizon,
         )
         for c in consolidated.values()
+        if max(
+            payload_by_ticker.get(c.ticker, {}).get("n_insiders", 0),
+            c.n_contributing,
+        ) >= min_buyers
     ]
     suggestion_store.insert_suggestions(records)
     return len(records)
