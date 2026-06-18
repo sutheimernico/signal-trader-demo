@@ -95,3 +95,35 @@ def anchored_walk_forward(
         test_end = train_end + test_size
         windows.append((series.iloc[:train_end], series.iloc[train_end:test_end]))
     return windows
+
+
+def purged_walk_forward(
+    dates: pd.Index,
+    n_splits: int = 3,
+    test_size: int = 252,
+    horizon: int = 5,
+    embargo: int = 0,
+) -> list[tuple[pd.Index, pd.Index]]:
+    """Date-level walk-forward with PURGE + EMBARGO for forward-looking labels.
+
+    For ML datasets where the label at date t spans t+1 .. t+1+horizon, training
+    dates within `horizon` of the test window have labels that bleed into the
+    test period — they are PURGED. An additional `embargo` of dates is dropped
+    so serial correlation just before the test cannot leak either. Returns
+    (train_dates, test_dates) per fold; the caller maps dates back to rows.
+    Train is anchored/expanding; test windows are fixed-size and contiguous.
+    """
+    dates = pd.Index(dates)
+    total = len(dates)
+    first_train = total - n_splits * test_size
+    if first_train <= 0:
+        raise ValueError("index too short for requested splits/test_size")
+    folds: list[tuple[pd.Index, pd.Index]] = []
+    for i in range(n_splits):
+        train_end = first_train + i * test_size
+        test_end = train_end + test_size
+        purge = horizon + embargo
+        train = dates[: max(0, train_end - purge)]
+        test = dates[train_end:test_end]
+        folds.append((train, test))
+    return folds
