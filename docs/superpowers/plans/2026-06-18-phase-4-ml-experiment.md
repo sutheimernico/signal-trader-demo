@@ -61,3 +61,15 @@ decliners/mid-caps via `--broad`):
 - **Caveat (honest):** still not a clean survivorship test — yfinance has no data for truly delisted names (WBA/PARA/etc. failed to load), so the universe is still survivors-only. Both PSRs ~0.98 reflect a 14-year bull market; only the ML-vs-baseline margin is meaningful.
 - **Blocked for a clean test:** need a point-in-time index-constituent + delisted-price feed (paid: CRSP/Sharadar/Norgate). Flagged to Nico.
 - Next honest checks: shift-test on the ML position series (timing-leakage robustness); recent-2-month focused readout.
+
+## Empirical overfitting check (2026-06-18, autonomous)
+
+Tested Nico's "more parameters" request directly: added PIT calendar/seasonality
+features (weekday, month, turn-of-month, quarter-end) and re-ran the SAME honest
+OOS eval (108 names, 630 rebalances):
+- price-only: ML +0.00505/rebal → BEATS baseline (+0.00361)
+- + calendar features: ML +0.00297/rebal (PSR 0.925) → LOSES to baseline
+- **More features made OOS WORSE — textbook overfitting.** Per honest-harness
+  discipline, calendar features were DISABLED (helper kept, off by default). This
+  is the empirical proof that "max parameters" backfires; complexity must earn
+  its place on the OOS test, not in-sample.
