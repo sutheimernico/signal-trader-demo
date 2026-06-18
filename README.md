@@ -17,5 +17,7 @@ Foundation-Report selbst ausführen: `uv run python scripts/backfill.py --ticker
 ## Daten-Caveats (wichtig)
 Freie Datenquellen sind nicht sauber. Bewusst behandelt: **Survivorship Bias**, **Adjustment-Restatement/Lookahead**, **Volumen-Repräsentativität** (IEX), **Insider-Verzug**. Siehe Spec §11.
 
+**Insider-Verzug (Track 1):** Handelstag + bis zu ~2 Geschäftstage Meldefrist + Polling ⇒ realistisch 2–3 Tage hinterher; Vorveröffentlichungs-Alpha ist nicht verfügbar. `timestamp_known` ist das Filing-Datum und das einzige Datum, das für Trades benutzt wird; `timestamp_event` (Handelstag) wird nur zur Auditierung gespeichert.
+
 ## Setup
 Wird in Phase 0 etabliert (Python via `uv`). Externe Zugänge (alle kostenlos): Alpaca Paper-Account, SEC-User-Agent-Kontakt, optional Tiingo. Keys nur via `.env` (nie committen).

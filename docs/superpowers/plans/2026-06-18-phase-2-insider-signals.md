@@ -2109,3 +2109,30 @@ Sources (edgartools API verification):
 - [Insider Trades (Form 4) reference — market_trades, has_10b5_1_plan, position](https://edgartools.readthedocs.io/en/stable/insider-filings/)
 - [Working with Filings — get_filings filing_date range syntax](https://edgartools.readthedocs.io/en/latest/guides/working-with-filing/)
 - [edgartools GitHub](https://github.com/dgunning/edgartools)
+
+---
+
+## Outcome (2026-06-18)
+
+All 12 tasks implemented strictly TDD. Suite: **128 passed**, ruff clean, all insider tests run fully offline (35 passed, edgartools mocked/faked).
+
+**Commits (this session, Tasks 8–12 + review fixes):**
+- `feat(scoring): point-in-time forward return per signal` (Task 8)
+- `feat(scoring): per-source hit-rate, forward return, and data lag` (Task 9)
+- `feat(strategy): consolidation and point-in-time insider entries/exits` (Task 10)
+- `feat(strategy): run insider signals through both engines with leakage check` (Task 11)
+- `feat(scripts): insider ingest, both-engine report, and live SEC smoke` (Task 12)
+- `fix(scoring): scope source score to report window; flag engine fill asymmetry` (final review)
+
+**Deviations from plan:**
+- Task 9 example test had a data-lag arithmetic bug (lags 1+3 averaged to 2.0 but asserted 2.5). Corrected the LOSE event date to lag 4 → (1+4)/2 = 2.5.
+- Task 11 shift-test rewritten after methodology review: the plan's version was vacuous on a monotonic series and its comment conflated shift-test (contemporaneous-leakage detection) with PIT-cleanness. Now uses seeded volatile data and asserts the harness *discriminates* — a leaky `sign(returns)` signal collapses (True), the PIT insider position does not (False). PIT entry timing stays covered by `test_entry_fires_on_bar_strictly_after_known`.
+- Final review: `score_source` now takes `start`/`end` so the printed hit-rate/lag covers the same window as the per-ticker P&L; report output now flags the vbt-vs-backtesting.py fill-timing asymmetry.
+
+**Rejected review finding:** "off-by-one in forward_return horizon" — miscount. Scorer (entry `iloc[0]` → exit `iloc[horizon]`) and strategy (`entry_pos` → `entry_pos + hold_bars`) both span the identical bar-1 → bar-6 window for horizon/hold = 5. Aligned, no fix needed.
+
+**Methodology reviews:** Tasks 3, 5, 6, 7 (prior session) + 9, 10, 11 + final full-diff pass (this session). No invalidating findings at any gate. Iron principles hold end to end: PIT (`timestamp_known` = filing date, entries strictly after known, no future-bar reads), after-cost everywhere with after-cost benchmark, no silent truncation (unparseable filings logged+skipped, unscoreable signals excluded not faked-miss), data-lag visible and persisted.
+
+**Open / controller-only:**
+- **Live SEC smoke not yet run.** `uv run python scripts/sec_smoke.py --ticker AAPL --start 2024-01-01 --end 2024-03-31` requires `SEC_IDENTITY` in `.env`; never run in pytest. This is the only live network step — Nico to run and confirm real observations with `known >= event`.
+- Consider (non-gate): break-even-cost line in report; surface routine-classification coverage when the ingestion window is < 3 years.
