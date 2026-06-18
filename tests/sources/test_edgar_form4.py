@@ -167,12 +167,11 @@ def test_observation_carries_edgar_source_url():
 def test_market_wide_parses_only_top_candidate_issuers():
     import pandas as pd
     # 3 issuers: cik 111 has 3 filings (cluster candidate), 222 has 1, 333 has 1
-    f_a1 = _filing(_form4_obj(), accession="a1"); f_a1.cik = 111
-    f_a2 = _filing(_form4_obj(), accession="a2"); f_a2.cik = 111
-    f_a3 = _filing(_form4_obj(), accession="a3"); f_a3.cik = 111
-    f_b = _filing(_form4_obj(), accession="b1"); f_b.cik = 222
-    f_c = _filing(_form4_obj(), accession="c1"); f_c.cik = 333
-    all_f = [f_a1, f_a2, f_a3, f_b, f_c]
+    all_f = []
+    for acc, cik in [("a1", 111), ("a2", 111), ("a3", 111), ("b1", 222), ("c1", 333)]:
+        f = _filing(_form4_obj(), accession=acc)
+        f.cik = cik
+        all_f.append(f)
     fake = MagicMock()
     fake.__iter__ = lambda self: iter(all_f)
     fake.to_pandas.return_value = pd.DataFrame(
