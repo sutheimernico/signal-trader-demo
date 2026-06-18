@@ -100,3 +100,19 @@ def test_cors_allows_vite_dev_origin(tmp_path):
     client = _client(tmp_path)
     resp = client.get("/suggestions", headers={"Origin": "http://localhost:5173"})
     assert resp.headers.get("access-control-allow-origin") == "http://localhost:5173"
+
+
+def test_serves_frontend_index_when_build_present(tmp_path):
+    static = tmp_path / "dist"
+    static.mkdir()
+    (static / "index.html").write_text("<html><body>KIT dashboard</body></html>")
+    db = tmp_path / "t.sqlite"
+    _seed(db)
+    from signal_trader.api.app import create_app
+    client = TestClient(create_app(db, static_dir=static))
+    # API still works
+    assert client.get("/source-scores").status_code == 200
+    # and the SPA index is served at root
+    root = client.get("/")
+    assert root.status_code == 200
+    assert "KIT dashboard" in root.text

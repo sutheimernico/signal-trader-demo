@@ -15,8 +15,10 @@ from typing import Literal
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from signal_trader import config
 from signal_trader.store.paper_trade_store import PaperTradeStore
 from signal_trader.store.signal_store import SignalStore
 from signal_trader.store.suggestion_store import SuggestionStore
@@ -33,7 +35,7 @@ class DecisionBody(BaseModel):
     decision: Literal["accepted", "rejected"]
 
 
-def create_app(db_path: Path) -> FastAPI:
+def create_app(db_path: Path, static_dir: Path | None = None) -> FastAPI:
     app = FastAPI(title="Signal Trader — measurement harness (paper-only)")
     app.add_middleware(
         CORSMiddleware,
@@ -112,5 +114,12 @@ def create_app(db_path: Path) -> FastAPI:
         except ValueError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         return {"ticker": ticker, "created_at": created_at, "status": body.decision}
+
+    # Serve the built React dashboard from the same origin (one process, one
+    # port) when a production build exists. Mounted last so API routes win.
+    # Absent in tests/dev (Vite serves the UI then) — guarded by existence.
+    frontend = static_dir if static_dir is not None else config.REPO_ROOT / "frontend" / "dist"
+    if frontend.is_dir():
+        app.mount("/", StaticFiles(directory=frontend, html=True), name="frontend")
 
     return app

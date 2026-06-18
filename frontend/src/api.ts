@@ -2,7 +2,10 @@
 // Mirrors the FastAPI read API (src/signal_trader/api/app.py). Single local
 // user, paper-only. Base URL is the one constant to change for a non-default port.
 
-export const API_BASE = "http://localhost:8000";
+// In dev (Vite on :5173) talk to the backend on :8000 (CORS-allowed). In the
+// production build the API is served from the SAME origin by uvicorn, so a
+// relative base ("") just works on whatever host/port the app is launched on.
+export const API_BASE = import.meta.env.DEV ? "http://localhost:8000" : "";
 
 export type Status = "open" | "accepted" | "rejected";
 export type Decision = "accepted" | "rejected";
