@@ -26,7 +26,9 @@ def _ticker_frame(
         cols[f"ret_{w}"] = close.pct_change(w, fill_method=None)  # close[t]/close[t-w]-1, uses <= t
         cols[f"vol_{w}"] = rets.rolling(w).std()      # vol of returns up to t
     frame = pd.DataFrame(cols)
-    _add_calendar(frame)
+    # NOTE: calendar/seasonality features were tested (2026-06-18) and made OOS
+    # WORSE (0.00505 -> 0.00297, lost to baseline) — overfitting. Kept off. The
+    # helper stays for documented experiments behind an explicit opt-in only.
     # Label: enter next bar (t+1), exit `horizon` bars later. Strictly future.
     entry = close.shift(-1)
     exit_ = close.shift(-(1 + horizon))
@@ -57,7 +59,9 @@ def _feature_frame(close: pd.Series, feature_windows: list[int]) -> pd.DataFrame
         cols[f"ret_{w}"] = close.pct_change(w, fill_method=None)
         cols[f"vol_{w}"] = rets.rolling(w).std()
     frame = pd.DataFrame(cols)
-    _add_calendar(frame)
+    # NOTE: calendar/seasonality features were tested (2026-06-18) and made OOS
+    # WORSE (0.00505 -> 0.00297, lost to baseline) — overfitting. Kept off. The
+    # helper stays for documented experiments behind an explicit opt-in only.
     return frame.dropna()
 
 
