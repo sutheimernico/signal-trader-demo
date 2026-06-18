@@ -76,8 +76,12 @@ Backend for Phase 3 is now functionally complete (165 tests, ruff clean, all off
 - `feat(api): dashboard server entrypoint` — `scripts/run_api.py` serves the read API via uvicorn; README documents all Phase-3 CLIs.
 - Methodology review caught and fixed a tz-naive/aware crash (`dt.datetime.now(tz=utc)`); test fixtures moved to aware datetimes so the regression is covered.
 
-**Remaining = genuinely external / FE:**
-- **Live smokes (controller-only, need keys):** SEC Form 4 (`scripts/sec_smoke.py`, `SEC_IDENTITY`) and the Alpaca paper loop (`scripts/run_forward_paper.py` with `ALPACA_API_KEY`/`ALPACA_API_SECRET`). Never in pytest.
-- **Track C React dashboard** — Nico's domain; design brief ready, API standing.
+### Track C (React dashboard) — DONE (2026-06-18)
+
+`feat(frontend): React 19 dashboard (KIT design) wired to the API` — `frontend/` Vite + React 19 + TS app, design ported verbatim from `signal-trader_v7_kit.html` (KIT sport-orange scoreboard). Three views (Suggestions with accept/reject → POST decision + refetch, Source Scorecard with thin-sample + data-lag emphasis, Paper Trades with open filter), typed API client (`src/api.ts`), loading/error/empty states. Backend got CORS for the Vite dev origin (`feat(api): allow Vite dev origins via CORS`). Verified: `npm run build` (tsc strict) clean, `npm run test` 7/7 (formatting helpers + decide flow), full API round-trip smoke green. Run: backend `scripts/run_api.py`, then `cd frontend && npm install && npm run dev`.
+
+**Remaining = genuinely external (need keys / live):**
+- **Live smokes (controller-only):** SEC Form 4 (`scripts/sec_smoke.py`, `SEC_IDENTITY`) and the Alpaca paper loop (`scripts/run_forward_paper.py` with `ALPACA_API_KEY`/`ALPACA_API_SECRET`). Never in pytest.
+- Optional polish (post-MVP): wire `npm install` reproducibility / FE lint into CI; intro-splash animation from the kit (omitted as non-essential).
 
 **Not done / deferred decisions (api-design-review, proportionate to local single-user scope):** Pydantic response_models (skipped for now — would improve OpenAPI), 204-vs-200 + 409 on idempotent re-decision, decided_at as date (store contract; loses intra-day ordering — fine for paper demo).
