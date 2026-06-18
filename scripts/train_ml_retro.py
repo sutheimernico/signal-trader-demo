@@ -33,6 +33,16 @@ UNIVERSE = [
     "DIS", "NFLX", "VZ", "T", "CMCSA",
 ]
 
+# Less survivorship-biased: names that declined / mid-caps / cyclicals with full
+# history. Added via --broad to gauge how much the edge depends on cherry-picked
+# current winners.
+BROAD_EXTRA = [
+    "INTC", "WBA", "PARA", "F", "GM", "PYPL", "SNAP", "PINS", "ROKU", "GME",
+    "NCLH", "CCL", "AAL", "UAL", "DAL", "CLF", "FCX", "M", "KSS", "GPS",
+    "HPQ", "DELL", "WU", "NWL", "HBI", "MOS", "CF", "DVN", "MRO", "APA",
+    "KHC", "K", "CAG", "TAP", "BEN", "IVZ", "LUMN", "VFC", "BBY", "DG",
+]
+
 
 def _load(cache: CacheService, tickers, start, end) -> dict[str, pd.Series]:
     out: dict[str, pd.Series] = {}
@@ -57,15 +67,19 @@ def main() -> None:
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--n-splits", type=int, default=10)
     parser.add_argument("--test-size", type=int, default=63)
+    parser.add_argument("--broad", action="store_true",
+                        help="add declined/mid-cap names to reduce survivorship bias")
     args = parser.parse_args()
+
+    tickers = UNIVERSE + BROAD_EXTRA if args.broad else UNIVERSE
 
     cache = CacheService(
         YFinanceProvider(),
         config.DATA_DIR / "ml_bars",
         config.DATA_DIR / "ml_cache.sqlite",
     )
-    print(f"Backfilling {len(UNIVERSE)} tickers {args.start}..{args.end} (isolated cache)…")
-    universe = _load(cache, UNIVERSE, args.start, args.end)
+    print(f"Backfilling {len(tickers)} tickers {args.start}..{args.end} (isolated cache)…")
+    universe = _load(cache, tickers, args.start, args.end)
     print(f"Loaded {len(universe)} tickers with sufficient history.")
 
     cost = CostModel(commission_per_trade=0.001, slippage=0.0005)
