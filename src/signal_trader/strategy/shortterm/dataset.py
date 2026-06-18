@@ -33,6 +33,39 @@ def _ticker_frame(
     return frame.dropna()
 
 
+def _feature_frame(close: pd.Series, feature_windows: list[int]) -> pd.DataFrame:
+    """Features only (no label) — for live prediction at 'today', point-in-time."""
+    rets = close.pct_change(fill_method=None)
+    cols: dict[str, pd.Series] = {}
+    for w in feature_windows:
+        cols[f"ret_{w}"] = close.pct_change(w, fill_method=None)
+        cols[f"vol_{w}"] = rets.rolling(w).std()
+    return pd.DataFrame(cols).dropna()
+
+
+def latest_features(
+    close_by_ticker: dict[str, pd.Series],
+    feature_windows: list[int] | None = None,
+) -> pd.DataFrame:
+    """Most-recent point-in-time feature row per ticker (no forward label needed).
+
+    Used by the autonomous paper loop to decide what to buy 'today': each ticker
+    contributes the features of its latest fully-formed bar. Index (ticker, date).
+    """
+    windows = feature_windows if feature_windows is not None else [5, 10, 20]
+    frames: list[pd.DataFrame] = []
+    for ticker, close in close_by_ticker.items():
+        frame = _feature_frame(close, windows)
+        if frame.empty:
+            continue
+        last = frame.iloc[[-1]]
+        last.index = pd.MultiIndex.from_product(
+            [[ticker], last.index], names=["ticker", "date"]
+        )
+        frames.append(last)
+    return pd.concat(frames) if frames else pd.DataFrame()
+
+
 def build_dataset(
     close_by_ticker: dict[str, pd.Series],
     horizon: int = 5,
