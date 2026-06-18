@@ -44,14 +44,19 @@ def main() -> None:
     # per-ticker, so this is equivalent to the batch call).
     total = 0
     for ticker in args.tickers:
-        close_lookup = _load_close_lookup([ticker], args.start, args.end)
-        n = build_insider_signals(
-            source, [ticker], args.start, args.end,
-            close_lookup=close_lookup, store=store,
-            window_days=args.window_days, min_insiders=args.min_insiders,
-        )
-        total += n
-        print(f"  {ticker}: +{n} signal(s)  (running total {total})", flush=True)
+        # One ticker with no price data (delisted, bad symbol) must not abort
+        # the basket: log and skip, keep what the others produced.
+        try:
+            close_lookup = _load_close_lookup([ticker], args.start, args.end)
+            n = build_insider_signals(
+                source, [ticker], args.start, args.end,
+                close_lookup=close_lookup, store=store,
+                window_days=args.window_days, min_insiders=args.min_insiders,
+            )
+            total += n
+            print(f"  {ticker}: +{n} signal(s)  (running total {total})", flush=True)
+        except Exception as exc:  # noqa: BLE001 - log + skip, continue the basket
+            print(f"  {ticker}: SKIPPED ({exc})", flush=True)
     print(f"Persisted {total} insider signal(s) into {config.SQLITE_PATH}")
 
 
