@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="KIT Signal Harness">
+  <!-- KIT monogram tile: scoreboard look, ink + sport-orange. Geometric
+       letterforms (no font dependency) so it renders identically everywhere. -->
+  <rect width="64" height="64" rx="13" fill="#15161a"/>
+  <!-- K (white): stem + two arms -->
+  <rect x="15" y="15" width="8.5" height="34" fill="#ffffff"/>
+  <path d="M23 32 L41 15 H47.5 L29.5 32 Z" fill="#ffffff"/>
+  <path d="M23 32 L41 49 H47.5 L29.5 32 Z" fill="#ffffff"/>
+  <!-- orange kit-stripe (the matchday accent) -->
+  <rect x="50.5" y="15" width="8.5" height="34" fill="#ff4d12"/>
+  <!-- scoreboard baseline -->
+  <rect x="15" y="52.5" width="44" height="3" fill="#ff4d12"/>
+</svg>
