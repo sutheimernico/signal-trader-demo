@@ -33,6 +33,21 @@ New dep (sanctioned by PROJECT.md stack): `lightgbm` (pinned). Reuses Phase-1 `b
 
 Task 1 (dataset builder) — the leakage surface that everything else depends on.
 
-## Outcome
+## Outcome (2026-06-18)
 
-_(filled as tasks complete)_
+All 6 tasks built TDD, methodology-reviewed, 185 tests green, ruff clean, all offline.
+- Task 1 dataset (PIT features/forward labels) — review: no lookahead; fixed silent NaN→0 via `fill_method=None`.
+- Task 2 `purged_walk_forward` — review: enforce `embargo>=1` (else 1-bar label/test overlap).
+- Task 3 `Forecaster` seam + `GBDTForecaster` (LightGBM, pinned).
+- Task 4 `evaluate_ml` — OOS after costs vs momentum baseline + PSR; per-fold leak-detector test; review: no invalidating leakage.
+- Task 5 `open_ml_positions` — autonomous paper loop (no confirmation), idempotent, log+skip.
+- Task 6 `scripts/run_ml_experiment.py` — train → evaluate → autonomous paper-trade.
+
+**First real result (honest, not edge):** bank/energy basket (14 tickers), 2023–2024, horizon 5, top-k 3, 4 folds → **84 OOS rebalances**. After costs:
+- ML (LightGBM, price features): mean **−0.0023**/rebalance, PSR 0.231
+- Momentum baseline: mean **+0.0033**/rebalance, PSR 0.790
+- **ML did NOT beat the baseline after costs.** This is the expected, honest finding — a naive price-feature GBDT does not earn its costs vs simple momentum for retail. Reported as a learning artifact, not hidden.
+
+**Autonomous paper trading is wired** (`run_ml_experiment.py` without `--no-trade` places top-k Alpaca **paper** orders, no confirmation) but given the model loses to baseline, trading it is not justified by the evaluation — left for Nico to kick off as an experiment.
+
+**Next experiments (would need their own methodology pass):** richer features (volume, cross-sectional rank, fundamentals — point-in-time), better label (rank/IC target), proper hyperparameter search inside the purged CV (no leakage), and a stronger/again-honest baseline.
