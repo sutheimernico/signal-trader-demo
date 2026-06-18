@@ -21,3 +21,23 @@ Freie Datenquellen sind nicht sauber. Bewusst behandelt: **Survivorship Bias**, 
 
 ## Setup
 Wird in Phase 0 etabliert (Python via `uv`). Externe Zugänge (alle kostenlos): Alpaca Paper-Account, SEC-User-Agent-Kontakt, optional Tiingo. Keys nur via `.env` (nie committen).
+
+## Workflows (CLIs)
+Alle paper-only; Live-Kontakt (SEC/Alpaca) braucht Keys in `.env`.
+
+```bash
+# Insider-Signale aus SEC Form 4 ingesten (gefiltert, point-in-time persistiert)
+uv run python scripts/ingest_insider.py --tickers AAPL MSFT --start 2024-01-01 --end 2024-12-31
+
+# Insider-Strategie-Report: beide Engines nach Kosten + Trefferquote/Datenverzug
+uv run python scripts/run_insider_report.py --tickers AAPL --start 2024-01-01 --end 2024-12-31
+
+# Forward-Paper-Loop: Suggestions bauen, akzeptierte öffnen, fällige schließen
+#   (Plumbing-Validierung, kein Performance-Beleg; Akzeptanz erfolgt im Dashboard)
+uv run python scripts/run_forward_paper.py --hold-days 5
+
+# Dashboard-Backend serven (Read-API; das React-Frontend spricht hiermit)
+uv run python scripts/run_api.py --port 8000
+```
+
+Das Dashboard (React, Phase 3) wird gegen die Read-API gebaut; Design-Brief: `docs/design/2026-06-18-dashboard-design-brief.md`.
