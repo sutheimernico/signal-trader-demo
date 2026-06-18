@@ -89,28 +89,35 @@ class EdgarForm4Source:
         self,
         start: str,
         end: str,
-        min_filings: int = 6,
-        max_candidates: int = 200,
+        min_filings: int = 3,
+        max_candidates: int = 300,
+        max_filings: int = 25,
     ) -> list[InsiderObservation]:
-        """Scan ALL Form 4 filings in [start, end] and parse only the issuers
-        with the most filings (candidate clusters), instead of hand-picked
-        tickers. edgartools indexes Form 4 by issuer CIK, so a cluster of insider
-        activity shows up as many filings under one CIK. We parse the top
-        `max_candidates` issuers having >= `min_filings`; the rest are reported as
-        skipped (no silent truncation). The purchase/cluster filters downstream
-        still decide what becomes a signal.
+        """Scan ALL Form 4 filings in [start, end] and parse candidate issuers.
+
+        edgartools indexes Form 4 by issuer CIK, so insider activity clusters as
+        many filings under one CIK. We keep issuers with `min_filings`..`max_filings`
+        filings: the floor catches small/young companies (a 3-insider buy cluster
+        is only ~3 filings — these are exactly the early names Nico wants), the
+        CEILING drops mega-caps whose 30+ filings are routine grants/sells (noise,
+        not buy clusters). Smaller-count issuers are prioritized (more likely a
+        focused buy cluster than a big company's routine churn). Downstream
+        purchase/cluster filters still decide what becomes a signal; nothing is
+        silently truncated.
         """
         set_identity(self._identity)
         filings = get_filings(form="4", filing_date=f"{start}:{end}")
         df = filings.to_pandas()
-        counts = df.groupby("cik").size().sort_values(ascending=False)
-        eligible = counts[counts >= min_filings]
+        counts = df.groupby("cik").size()
+        eligible = counts[(counts >= min_filings) & (counts <= max_filings)]
+        # ascending: favor focused small-cap clusters over big routine churn
+        eligible = eligible.sort_values(ascending=True)
         candidate_ciks = set(eligible.head(max_candidates).index)
         skipped = len(eligible) - len(candidate_ciks)
         if skipped > 0:
             _LOG.warning(
-                "market scan: %d issuers >= %d filings, parsing top %d, skipping %d",
-                len(eligible), min_filings, len(candidate_ciks), skipped,
+                "market scan: %d issuers in [%d,%d] filings, parsing %d, skipping %d",
+                len(eligible), min_filings, max_filings, len(candidate_ciks), skipped,
             )
         observations: list[InsiderObservation] = []
         for filing in filings:
