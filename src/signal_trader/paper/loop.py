@@ -59,3 +59,36 @@ def open_accepted_suggestions(
         already_traded.add(sid)
         opened += 1
     return opened
+
+
+def close_due_trades(
+    trade_store: PaperTradeStore,
+    broker: Broker,
+    as_of: dt.datetime,
+    hold_days: int,
+) -> int:
+    """Close open trades held >= hold_days as of `as_of`. Returns count closed.
+
+    Exit price/time/pnl come from the ACTUAL sell fill the broker reports
+    (Spec §8.1) — never an idealized close. `as_of` is the wall-clock the loop
+    runs at (injected so tests are deterministic); a trade is due when at least
+    `hold_days` have elapsed since its entry. One failed sell logs and skips,
+    never aborting the rest.
+    """
+    closed = 0
+    hold = dt.timedelta(days=hold_days)
+    for trade in trade_store.read_trades(open_only=True):
+        if as_of - trade.entry_time < hold:
+            continue
+        try:
+            fill = broker.submit_market_sell(trade.ticker, trade.qty)
+            pnl = (fill.price - trade.entry_price) * trade.qty
+            trade_store.close_trade(
+                trade.id, exit_price=fill.price,
+                exit_time=fill.filled_at, pnl=pnl,
+            )
+        except Exception as exc:  # noqa: BLE001 - log + skip, continue the loop
+            _LOG.warning("skip paper-close for trade %s: %s", trade.id, exc)
+            continue
+        closed += 1
+    return closed

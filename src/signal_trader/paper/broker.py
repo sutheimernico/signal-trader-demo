@@ -28,3 +28,7 @@ class Broker(Protocol):
     def submit_market_buy(self, symbol: str, qty: float) -> Fill:
         """Submit a paper market buy and return the resulting fill."""
         ...
+
+    def submit_market_sell(self, symbol: str, qty: float) -> Fill:
+        """Submit a paper market sell and return the resulting fill."""
+        ...
