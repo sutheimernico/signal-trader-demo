@@ -37,3 +37,23 @@ def test_only_drops_the_routine_month_not_other_months():
     other = [_obs("Jane", "AAPL", 2023, 6)]
     kept = keep_opportunistic(routine_jan + other)
     assert kept == other
+
+
+# Fix 1: short-window degradation warning
+def test_short_window_emits_warning(caplog):
+    """< 3-year span (< 1095 days) triggers a WARNING about unreliable routine classification."""
+    import logging
+    obs = [_obs("Bob", "AAPL", 2024, 1), _obs("Bob", "AAPL", 2024, 6)]
+    with caplog.at_level(logging.WARNING, logger="signal_trader.signals.insider.opportunistic"):
+        keep_opportunistic(obs)
+    assert any("routine" in r.message.lower() for r in caplog.records)
+
+
+def test_long_window_no_short_window_warning(caplog):
+    """>= 3-year span does NOT trigger the short-window WARNING."""
+    import logging
+    # Span: 2021-01-10 to 2024-01-10 = 3 years > 1095 days
+    obs = [_obs("Bob", "AAPL", 2021, 1), _obs("Bob", "AAPL", 2024, 1)]
+    with caplog.at_level(logging.WARNING, logger="signal_trader.signals.insider.opportunistic"):
+        keep_opportunistic(obs)
+    assert not any("routine" in r.message.lower() for r in caplog.records)

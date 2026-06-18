@@ -1,8 +1,9 @@
 import datetime as dt
 
 import pandas as pd
+import pytest
 
-from signal_trader.signals.insider.pipeline import build_insider_signals
+from signal_trader.signals.insider.pipeline import _price_at_or_before, build_insider_signals
 from signal_trader.sources.insider_source import InsiderObservation
 from signal_trader.store.signal_store import SignalStore
 
@@ -77,3 +78,62 @@ def test_price_at_known_uses_last_bar_at_or_before_known_not_future(tmp_path):
     series = _close_lookup()["AAPL"]
     expected = float(series.loc[:known_idx].iloc[-1])
     assert r.price_at_known == expected
+
+
+# Fix 2: price lookup guard
+def test_price_at_or_before_non_datetimeindex_raises():
+    """Non-DatetimeIndex Series must raise AssertionError immediately."""
+    bad = pd.Series([100.0, 101.0], index=[0, 1])
+    with pytest.raises(AssertionError, match="DatetimeIndex"):
+        _price_at_or_before(bad, dt.date(2024, 1, 5))
+
+
+# Fix 6: small-cap tilt parameter
+def test_max_price_filters_observations_before_clustering(tmp_path):
+    """With max_price set, only sub-threshold observations reach the cluster stage."""
+    source = FakeSource([
+        # Three cheap buyers -> should cluster
+        _obs("A", "AAPL", 1, price=5.0),
+        _obs("B", "AAPL", 2, price=5.0),
+        _obs("C", "AAPL", 3, price=5.0),
+        # Three expensive buyers for MSFT -> should be filtered out
+        _obs("A", "MSFT", 1, price=500.0),
+        _obs("B", "MSFT", 2, price=500.0),
+        _obs("C", "MSFT", 3, price=500.0),
+    ])
+    store = SignalStore(tmp_path / "t.sqlite")
+    build_insider_signals(
+        source, ["AAPL", "MSFT"], "2024-01-01", "2024-01-31",
+        close_lookup=_close_lookup(), store=store,
+        window_days=10, min_insiders=3, max_price=50.0,
+    )
+    rows = store.read_signals(source="insider_form4")
+    tickers = {r.ticker for r in rows}
+    assert "AAPL" in tickers
+    assert "MSFT" not in tickers
+
+
+def test_no_max_price_passes_all_observations_through(tmp_path):
+    """Default max_price=None: no small-cap filter applied, both tickers can cluster."""
+    idx = pd.date_range("2024-01-01", periods=60, freq="D")
+    close = {
+        "AAPL": pd.Series(range(100, 160), index=idx, dtype=float),
+        "MSFT": pd.Series(range(200, 260), index=idx, dtype=float),
+    }
+    source = FakeSource([
+        _obs("A", "AAPL", 1, price=5.0),
+        _obs("B", "AAPL", 2, price=5.0),
+        _obs("C", "AAPL", 3, price=5.0),
+        _obs("A", "MSFT", 1, price=500.0),
+        _obs("B", "MSFT", 2, price=500.0),
+        _obs("C", "MSFT", 3, price=500.0),
+    ])
+    store = SignalStore(tmp_path / "t.sqlite")
+    build_insider_signals(
+        source, ["AAPL", "MSFT"], "2024-01-01", "2024-01-31",
+        close_lookup=close, store=store,
+        window_days=10, min_insiders=3,
+    )
+    tickers = {r.ticker for r in store.read_signals(source="insider_form4")}
+    assert "AAPL" in tickers
+    assert "MSFT" in tickers

@@ -114,3 +114,34 @@ def test_unparseable_filing_is_skipped_not_silently_truncated(caplog):
         out = EdgarForm4Source(identity="X y@z.com").fetch(["AAPL"], "2024-01-01", "2024-01-31")
     assert len(out) == 1  # good one survives
     assert any("skip" in r.message.lower() for r in caplog.records)
+
+
+# Fix 5: None/empty market_trades is a normal case, not a parse error
+def test_none_market_trades_is_clean_skip_no_warning(caplog):
+    """Filing with market_trades=None (no P/S rows) must not log a warning."""
+    import logging
+    obj = _form4_obj()
+    obj.market_trades = None
+    with patch("signal_trader.sources.edgar_form4.set_identity"), patch(
+        "signal_trader.sources.edgar_form4.Company",
+        return_value=_patched_company([_filing(obj)]),
+    ):
+        with caplog.at_level(logging.WARNING, logger="signal_trader.sources.edgar_form4"):
+            out = EdgarForm4Source(identity="X y@z.com").fetch(["AAPL"], "2024-01-01", "2024-01-31")
+    assert out == []
+    assert not any(r.levelno >= logging.WARNING for r in caplog.records)
+
+
+def test_empty_market_trades_is_clean_skip_no_warning(caplog):
+    """Filing with empty DataFrame market_trades must not log a warning."""
+    import logging
+    obj = _form4_obj()
+    obj.market_trades = pd.DataFrame()
+    with patch("signal_trader.sources.edgar_form4.set_identity"), patch(
+        "signal_trader.sources.edgar_form4.Company",
+        return_value=_patched_company([_filing(obj)]),
+    ):
+        with caplog.at_level(logging.WARNING, logger="signal_trader.sources.edgar_form4"):
+            out = EdgarForm4Source(identity="X y@z.com").fetch(["AAPL"], "2024-01-01", "2024-01-31")
+    assert out == []
+    assert not any(r.levelno >= logging.WARNING for r in caplog.records)

@@ -66,6 +66,9 @@ class EdgarForm4Source:
         obj = filing.obj()
         known = _to_date(filing.filing_date)
         trades = obj.market_trades
+        # None or empty DataFrame means no P/S transactions — normal case, not an error.
+        if trades is None or trades.empty:
+            return []
         out: list[InsiderObservation] = []
         for row in trades.itertuples(index=False):
             out.append(

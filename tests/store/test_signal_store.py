@@ -1,5 +1,6 @@
 import datetime as dt
 import json
+import logging
 
 from signal_trader.store.signal_store import SignalRecord, SignalStore
 
@@ -54,3 +55,18 @@ def test_price_at_known_may_be_none_when_no_bar(tmp_path):
     store.insert_signals([_rec(price_at_known=None,
                                raw_payload={"accession_no": "c"})])
     assert store.read_signals(source="insider_form4")[0].price_at_known is None
+
+
+# Fix 4: surface silently-ignored re-ingests
+def test_duplicate_reinsert_emits_info_log(tmp_path, caplog):
+    """Re-inserting a record with an existing PK must log how many were left unchanged."""
+    store = SignalStore(tmp_path / "t.sqlite")
+    store.insert_signals([_rec()])  # first insert
+    with caplog.at_level(logging.DEBUG, logger="signal_trader.store.signal_store"):
+        store.insert_signals([_rec()])  # duplicate -> INSERT OR IGNORE silently ignores
+    assert any(
+        "existing" in r.message.lower()
+        or "unchanged" in r.message.lower()
+        or "ignored" in r.message.lower()
+        for r in caplog.records
+    )

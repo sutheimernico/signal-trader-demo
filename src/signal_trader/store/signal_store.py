@@ -10,9 +10,12 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import logging
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
+
+_LOG = logging.getLogger(__name__)
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS signals (
@@ -84,13 +87,20 @@ class SignalStore:
             for r in records
         ]
         with self._connect() as con:
-            con.executemany(
+            cur = con.executemany(
                 "INSERT OR IGNORE INTO signals "
                 "(source, ticker, signal_type, direction, timestamp_event, "
                 "timestamp_known, price_at_known, raw_payload, confidence, "
                 "accession_no) VALUES (?,?,?,?,?,?,?,?,?,?)",
                 rows,
             )
+            inserted = cur.rowcount
+            ignored = len(rows) - inserted
+            if ignored > 0:
+                _LOG.info(
+                    "%d signal(s) already existed and were left unchanged (INSERT OR IGNORE)",
+                    ignored,
+                )
 
     def read_signals(
         self,

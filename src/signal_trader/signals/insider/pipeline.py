@@ -12,7 +12,7 @@ import datetime as dt
 
 import pandas as pd
 
-from signal_trader.signals.insider.cluster import cluster_purchases
+from signal_trader.signals.insider.cluster import cluster_purchases, keep_small_cap
 from signal_trader.signals.insider.filters import keep_open_market_purchases
 from signal_trader.signals.insider.opportunistic import keep_opportunistic
 from signal_trader.sources.insider_source import InsiderSource
@@ -23,6 +23,9 @@ _SIGNAL_TYPE = "insider_cluster_purchase"
 
 
 def _price_at_or_before(close: pd.Series, known: dt.date) -> float | None:
+    assert isinstance(close.index, pd.DatetimeIndex), (
+        "price lookup Series must have a DatetimeIndex"
+    )
     prior = close.loc[: pd.Timestamp(known)]
     if prior.empty:
         return None
@@ -38,10 +41,18 @@ def build_insider_signals(
     store: SignalStore,
     window_days: int = 10,
     min_insiders: int = 3,
+    max_price: float | None = None,
 ) -> int:
-    """Fetch, filter, cluster, price, and persist insider signals. Returns count."""
+    """Fetch, filter, cluster, price, and persist insider signals. Returns count.
+
+    ``max_price``: when set, applies a crude small-cap tilt (share price proxy)
+    after the purchase/opportunistic filters and before clustering. Default None
+    means no tilt — unchanged behavior.
+    """
     observations = source.fetch(tickers, start, end)
     purchases = keep_opportunistic(keep_open_market_purchases(observations))
+    if max_price is not None:
+        purchases = keep_small_cap(purchases, max_price)
     clusters = cluster_purchases(
         purchases, window_days=window_days, min_insiders=min_insiders
     )

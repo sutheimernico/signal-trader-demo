@@ -6,14 +6,24 @@ trades are dropped. Everything else is "opportunistic" and kept. We classify
 per (owner, ticker, month) using the trade date (timestamp_event); this is a
 property of the trade pattern, not a point-in-time trading decision, so using
 event time here is correct.
+
+Precondition: ``observations`` should span at least 3 years of prior history
+per insider so that routine calendar-month patterns can be reliably identified.
+If the input window is shorter than ~1095 days, routine traders will silently
+pass through (not enough history to classify them). A WARNING is emitted when
+this precondition is not met.
 """
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 
 from signal_trader.sources.insider_source import InsiderObservation
 
 _ROUTINE_CONSECUTIVE_YEARS = 3
+_MIN_WINDOW_DAYS = 1095  # ≈ 3 years
+
+_LOG = logging.getLogger(__name__)
 
 
 def _routine_keys(
@@ -37,7 +47,22 @@ def _has_consecutive_run(years: set[int], length: int) -> bool:
 def keep_opportunistic(
     observations: list[InsiderObservation],
 ) -> list[InsiderObservation]:
-    """Drop trades whose (owner, ticker, month) is a routine 3-year pattern."""
+    """Drop trades whose (owner, ticker, month) is a routine 3-year pattern.
+
+    Requires full multi-year insider history (>= 3 years) in ``observations``
+    for reliable routine classification. Emits a WARNING when the input span
+    is shorter than 1095 days.
+    """
+    if observations:
+        dates = [o.timestamp_event for o in observations]
+        span_days = (max(dates) - min(dates)).days
+        if span_days < _MIN_WINDOW_DAYS:
+            _LOG.warning(
+                "routine classification may be unreliable: observation window "
+                "spans only %d days (< %d required for 3-year pattern detection)",
+                span_days,
+                _MIN_WINDOW_DAYS,
+            )
     routine = _routine_keys(observations)
     return [
         o
