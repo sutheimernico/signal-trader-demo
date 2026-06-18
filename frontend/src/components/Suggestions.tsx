@@ -16,6 +16,36 @@ const FILTERS: { f: Filter; label: string }[] = [
   { f: "all", label: "All" },
 ];
 
+function fmtDate(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  return `${d}.${m}.${y}`;
+}
+
+function sourceInfo(source: string): { actor: string; lag: string } {
+  if (source.includes("13f"))
+    return { actor: "Star-Investoren", lag: "13F, ~45 Tage Meldeverzug" };
+  if (source.includes("congress"))
+    return { actor: "US-Abgeordnete", lag: "STOCK Act, ~30–45 Tage Verzug" };
+  return { actor: "Insider", lag: "Form 4, 2–3 Tage Verzug" };
+}
+
+/** Plain-language, FACTUAL one-liner — only from disclosed data, never invented
+ *  reasons (no LLM speculation). Says who bought what and since when. */
+function summarize(s: Suggestion): string {
+  const cs = s.contributing_signals;
+  const { actor, lag } = sourceInfo(cs.source);
+  const count = cs.n_insiders ?? cs.n_contributing;
+  const names = cs.insiders ?? [];
+  const who =
+    names.length > 0
+      ? `: ${names.slice(0, 4).join(", ")}${names.length > 4 ? " u. a." : ""}`
+      : "";
+  const verb = count > 1 ? "kauften" : "kaufte";
+  return `${count} ${actor} ${verb} ${s.company}${who}. Öffentlich seit ${fmtDate(
+    s.latest_known,
+  )} (${lag}).`;
+}
+
 export function Suggestions({
   suggestions,
   onDecided,
@@ -26,7 +56,9 @@ export function Suggestions({
   const [filter, setFilter] = useState<Filter>("open");
   const [busy, setBusy] = useState<string | null>(null);
 
-  const rows = suggestions.filter((s) => (filter === "all" ? true : s.status === filter));
+  const rows = suggestions
+    .filter((s) => (filter === "all" ? true : s.status === filter))
+    .sort((a, b) => b.consolidated_score - a.consolidated_score); // strongest first
 
   async function decide(s: Suggestion, decision: Decision) {
     const key = `${s.ticker}|${s.created_at}`;
@@ -111,46 +143,21 @@ export function Suggestions({
                   </div>
                 </div>
                 <div className="meta">
-                  {(() => {
-                    const is13f = s.contributing_signals.source.includes("13f");
-                    const label = is13f
-                      ? "superinvestor 13F"
-                      : s.contributing_signals.source;
-                    const noun = is13f ? "famous funds" : "insiders";
-                    const lag = is13f
-                      ? "13F is filed ~45 days after quarter end — a known lag, not pre-news."
-                      : "Insiders file 2–3 days after they trade — the pre-filing move is gone; this is the residual only.";
-                    const count =
-                      s.contributing_signals.n_insiders ??
-                      s.contributing_signals.n_contributing;
-                    return (
-                      <>
-                        <span className="src">{label}</span> · {count} {noun} bought
-                        (consensus). {lag}
-                      </>
-                    );
-                  })()}
-                  {s.contributing_signals.insiders &&
-                    s.contributing_signals.insiders.length > 0 && (
-                      <span className="insiders">
-                        Who: {s.contributing_signals.insiders.join(" · ")}
-                      </span>
-                    )}
+                  <div className="summary">{summarize(s)}</div>
                   {s.contributing_signals.sources &&
                     s.contributing_signals.sources.length > 0 && (
-                      <span className="sources">
-                        SEC source:{" "}
-                        {s.contributing_signals.sources.map((u, j) => (
-                          <a
-                            key={u}
-                            href={u}
-                            target="_blank"
-                            rel="noreferrer noopener"
-                          >
-                            filing {j + 1}
-                          </a>
-                        ))}
-                      </span>
+                      <details className="src-detail">
+                        <summary>
+                          Quellen ansehen ({s.contributing_signals.sources.length})
+                        </summary>
+                        <div className="src-list">
+                          {s.contributing_signals.sources.map((u, j) => (
+                            <a key={u} href={u} target="_blank" rel="noreferrer noopener">
+                              Original-Meldung {j + 1} ↗
+                            </a>
+                          ))}
+                        </div>
+                      </details>
                     )}
                 </div>
                 <div className="card-foot">
