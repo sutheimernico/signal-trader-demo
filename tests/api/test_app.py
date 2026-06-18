@@ -94,3 +94,9 @@ def test_invalid_decision_value_rejected(tmp_path):
         "/suggestions/AAPL/2024-01-12/decision", json={"decision": "maybe"}
     )
     assert resp.status_code == 422
+
+
+def test_cors_allows_vite_dev_origin(tmp_path):
+    client = _client(tmp_path)
+    resp = client.get("/suggestions", headers={"Origin": "http://localhost:5173"})
+    assert resp.headers.get("access-control-allow-origin") == "http://localhost:5173"

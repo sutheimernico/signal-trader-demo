@@ -14,11 +14,19 @@ from pathlib import Path
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from signal_trader.store.paper_trade_store import PaperTradeStore
 from signal_trader.store.signal_store import SignalStore
 from signal_trader.store.suggestion_store import SuggestionStore
+
+# Local dashboard dev servers (Vite). This API is local single-user and
+# paper-only; CORS is opened to the dev origins so the React app can fetch it.
+_DEV_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
 
 
 class DecisionBody(BaseModel):
@@ -27,6 +35,12 @@ class DecisionBody(BaseModel):
 
 def create_app(db_path: Path) -> FastAPI:
     app = FastAPI(title="Signal Trader — measurement harness (paper-only)")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_DEV_ORIGINS,
+        allow_methods=["GET", "POST"],
+        allow_headers=["*"],
+    )
     suggestions = SuggestionStore(db_path)
     signals = SignalStore(db_path)
     trades = PaperTradeStore(db_path)
