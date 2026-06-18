@@ -51,11 +51,16 @@ def main() -> None:
     for o in obs:
         counts.setdefault(o.ticker, set()).add(o.member)
     consensus = sorted(t for t, m in counts.items() if len(m) >= 2)
-    print(f"{len(obs)} buys across {len(tickers)} tickers; {len(consensus)} with >=2-member consensus: {consensus}")
+    print(
+        f"{len(obs)} buys across {len(tickers)} tickers; "
+        f"{len(consensus)} with >=2-member consensus: {consensus}"
+    )
     close_lookup = _load_close_lookup(consensus, args.price_start, args.end)
     store = SignalStore(config.SQLITE_PATH)
     n = persist_congress_signals(obs, close_lookup, store)
-    n_sug = build_suggestions(store, SuggestionStore(config.SQLITE_PATH), source=SOURCE_NAME, min_buyers=2)
+    n_sug = build_suggestions(
+        store, SuggestionStore(config.SQLITE_PATH), source=SOURCE_NAME, min_buyers=2
+    )
     print(f"Persisted {n} congress signal(s); {n_sug} consensus suggestion(s)")
 
 
