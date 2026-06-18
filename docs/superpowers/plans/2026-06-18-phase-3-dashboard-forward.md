@@ -52,6 +52,16 @@ Track C — React 19 dashboard (DESIGN INPUT: Nico's growth area)
 
 Starting Track A1 (SuggestionStore + PaperTradeStore) via TDD — unblocked, unambiguous from spec, reuses the SignalStore pattern verbatim. Tracks B and C wait on the open inputs above.
 
-## Outcome
+## Outcome (2026-06-18)
 
-_(filled as tasks complete)_
+**Track A (backend foundation) — COMPLETE.** 149 tests pass, ruff clean, all offline.
+- A1 `feat(store): Suggestion and PaperTrade persistence with integrity guards` — SQLite stores mirroring SignalStore; added rowcount guards (close_trade raises on double-close/unknown id; record_decision raises on lost decision) after methodology review flagged silent-overwrite risks for the forward run.
+- A2 `feat(signals): build point-in-time Suggestions from consolidated signals` — reuses consolidate_per_ticker; created_at == latest_known (PIT), idempotent re-run.
+- A3+A4 `feat(api): FastAPI read endpoints + suggestion decision` — GET /suggestions (?status), /source-scores (data-lag always visible), /paper-trades (?open_only); POST decision. After api-design-review: 422 on malformed date (was 422-vs-404 confusion), contributing_signals returned as parsed object, decision constrained to Literal[accepted,rejected].
+- New deps (spec-mandated): `fastapi==0.137.2`, `uvicorn==0.49.0`, pinned; uv.lock updated.
+
+**Deferred — not started (genuinely blocked, need Nico):**
+- **Track B (Alpaca paper loop)** — blocked on paper API keys in `.env` (PROJECT.md open input). No live calls until keys exist; never in pytest.
+- **Track C (React 19 dashboard)** — needs a `brainstorming` pass on MVP scope (views, server-state lib, build tooling) before its own plan. Wires to the Track A API now standing.
+
+**Not done / deferred decisions (api-design-review, proportionate to local single-user scope):** Pydantic response_models (skipped for now — would improve OpenAPI), 204-vs-200 + 409 on idempotent re-decision, decided_at as date (store contract; loses intra-day ordering — fine for paper demo).
