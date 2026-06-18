@@ -26,11 +26,27 @@ def _ticker_frame(
         cols[f"ret_{w}"] = close.pct_change(w, fill_method=None)  # close[t]/close[t-w]-1, uses <= t
         cols[f"vol_{w}"] = rets.rolling(w).std()      # vol of returns up to t
     frame = pd.DataFrame(cols)
+    _add_calendar(frame)
     # Label: enter next bar (t+1), exit `horizon` bars later. Strictly future.
     entry = close.shift(-1)
     exit_ = close.shift(-(1 + horizon))
     frame["__label__"] = exit_ / entry - 1.0
     return frame.dropna()
+
+
+def _add_calendar(frame: pd.DataFrame) -> None:
+    """Add point-in-time calendar/seasonality features from the date index alone.
+
+    Derived only from the bar's own date — trivially leakage-free and identical
+    in training and live prediction. Captures the seasonality Nico asked for
+    (quarter, turn-of-month, weekday). Tree models split on these as regime cues.
+    """
+    idx = pd.DatetimeIndex(frame.index)
+    frame["cal_dow"] = idx.dayofweek.astype(float)        # 0=Mon..4=Fri
+    frame["cal_month"] = idx.month.astype(float)
+    frame["cal_dom"] = idx.day.astype(float)
+    frame["cal_turn_of_month"] = ((idx.day >= 26) | (idx.day <= 3)).astype(float)
+    frame["cal_quarter_end_month"] = idx.month.isin([3, 6, 9, 12]).astype(float)
 
 
 def _feature_frame(close: pd.Series, feature_windows: list[int]) -> pd.DataFrame:
@@ -40,7 +56,9 @@ def _feature_frame(close: pd.Series, feature_windows: list[int]) -> pd.DataFrame
     for w in feature_windows:
         cols[f"ret_{w}"] = close.pct_change(w, fill_method=None)
         cols[f"vol_{w}"] = rets.rolling(w).std()
-    return pd.DataFrame(cols).dropna()
+    frame = pd.DataFrame(cols)
+    _add_calendar(frame)
+    return frame.dropna()
 
 
 def latest_features(
