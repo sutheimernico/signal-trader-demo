@@ -112,10 +112,16 @@ export function Suggestions({
                 </div>
                 <div className="meta">
                   <span className="src">{s.contributing_signals.source}</span> ·{" "}
-                  {s.contributing_signals.n_contributing} insider
-                  {s.contributing_signals.n_contributing > 1 ? "s" : ""} clustered.
-                  Insiders file 2–3 days after they trade — the pre-filing move is
-                  gone; this is the residual only.
+                  {s.contributing_signals.n_insiders ??
+                    s.contributing_signals.n_contributing}{" "}
+                  insiders bought (clustered). Insiders file 2–3 days after they
+                  trade — the pre-filing move is gone; this is the residual only.
+                  {s.contributing_signals.insiders &&
+                    s.contributing_signals.insiders.length > 0 && (
+                      <span className="insiders">
+                        Who: {s.contributing_signals.insiders.join(" · ")}
+                      </span>
+                    )}
                   {s.contributing_signals.sources &&
                     s.contributing_signals.sources.length > 0 && (
                       <span className="sources">

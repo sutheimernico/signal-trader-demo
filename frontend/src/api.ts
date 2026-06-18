@@ -16,6 +16,8 @@ export interface Suggestion {
   contributing_signals: {
     source: string;
     n_contributing: number;
+    insiders?: string[]; // names of the insiders who bought
+    n_insiders?: number;
     sources?: string[]; // EDGAR filing links (source of record)
   };
   created_at: string;
