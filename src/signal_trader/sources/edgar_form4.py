@@ -124,7 +124,11 @@ class EdgarForm4Source:
             if getattr(filing, "cik", None) not in candidate_ciks:
                 continue
             try:
-                observations.extend(self._observations_from_filing("", filing))
+                # Drop rows without a resolvable issuer ticker — untradeable,
+                # would surface as a junk "N/A" suggestion otherwise.
+                observations.extend(
+                    o for o in self._observations_from_filing("", filing) if o.ticker
+                )
             except Exception as exc:  # noqa: BLE001 - log + skip, never truncate silently
                 _LOG.warning(
                     "skip unparseable Form 4 %s: %s",
