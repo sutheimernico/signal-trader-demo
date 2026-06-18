@@ -113,6 +113,11 @@ def purged_walk_forward(
     (train_dates, test_dates) per fold; the caller maps dates back to rows.
     Train is anchored/expanding; test windows are fixed-size and contiguous.
     """
+    if embargo < 1:
+        raise ValueError(
+            "embargo must be >= 1: with embargo=0 the last training label's exit "
+            "bar lands on the first test bar (one-bar label overlap / leak)"
+        )
     dates = pd.Index(dates)
     total = len(dates)
     first_train = total - n_splits * test_size

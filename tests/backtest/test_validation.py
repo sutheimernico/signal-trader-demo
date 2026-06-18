@@ -90,6 +90,7 @@ def test_oos_split_rejects_unsorted_index():
 
 def test_purged_walk_forward_purges_label_overlap_and_embargo():
     import pandas as pd
+
     from signal_trader.backtest.validation import purged_walk_forward
     dates = pd.date_range("2024-01-01", periods=20, freq="B")
     folds = purged_walk_forward(dates, n_splits=2, test_size=5, horizon=2, embargo=1)
@@ -97,8 +98,7 @@ def test_purged_walk_forward_purges_label_overlap_and_embargo():
     for train, test in folds:
         # train and test never overlap
         assert set(train).isdisjoint(set(test))
-        # purge+embargo gap: last train date is >= horizon+embargo before test start
-        gap = (test[0] - train[-1]).days
+        # purge+embargo gap: last train date is strictly before test start
         assert train[-1] < test[0]
         assert len(train) > 0
     # fold 0: train_end=10, purge 2+1 -> train = first 7 dates
