@@ -19,6 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from signal_trader import config
+from signal_trader.market_data.company_names import load_names
 from signal_trader.store.paper_trade_store import PaperTradeStore
 from signal_trader.store.signal_store import SignalStore
 from signal_trader.store.suggestion_store import SuggestionStore
@@ -46,12 +47,14 @@ def create_app(db_path: Path, static_dir: Path | None = None) -> FastAPI:
     suggestions = SuggestionStore(db_path)
     signals = SignalStore(db_path)
     trades = PaperTradeStore(db_path)
+    names = load_names(config.DATA_DIR / "ticker_names.json")  # ticker -> company
 
     @app.get("/suggestions")
     def get_suggestions(status: str | None = None) -> list[dict]:
         return [
             {
                 "ticker": s.ticker,
+                "company": names.get(s.ticker.upper(), s.ticker),
                 "consolidated_score": s.consolidated_score,
                 "contributing_signals": json.loads(s.contributing_signals_json),
                 "created_at": s.created_at.isoformat(),
@@ -84,6 +87,7 @@ def create_app(db_path: Path, static_dir: Path | None = None) -> FastAPI:
             {
                 "id": t.id,
                 "ticker": t.ticker,
+                "company": names.get(t.ticker.upper(), t.ticker),
                 "side": t.side,
                 "qty": t.qty,
                 "entry_price": t.entry_price,

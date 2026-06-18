@@ -78,6 +78,8 @@ main{padding:26px 0 56px}
 .card.open .kitno{background:var(--orange)}
 .ct-main{flex:1;padding:11px 14px;display:flex;justify-content:space-between;align-items:center}
 .tk{font-family:var(--disp);font-weight:700;font-size:30px;line-height:.85;text-transform:uppercase}
+.company{font-family:var(--disp);font-weight:700;font-size:21px;line-height:.95;letter-spacing:.005em}
+.ticker-sub{font-family:var(--mono);font-weight:600;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin-top:5px}
 .horizon{font-family:var(--mono);font-weight:600;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin-top:4px}
 .chip{font-family:var(--mono);font-weight:600;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;padding:4px 9px;border:1.5px solid var(--ink);align-self:flex-start}
 .chip.open{background:var(--orange);color:#fff;border-color:var(--orange)}

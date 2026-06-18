@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+uv run python -c "from signal_trader import config; from signal_trader.market_data.company_names import refresh_name_cache; refresh_name_cache(config.DATA_DIR/'ticker_names.json', config.sec_identity())" 2>/dev/null || true
 # Daily self-refresh: market-wide insider scan (rolling window) + 13F. Keeps the
 # dashboard suggestions fresh with no human action. Logs to /tmp/daily_refresh.log.
 set -uo pipefail

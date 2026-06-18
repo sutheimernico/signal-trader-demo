@@ -54,7 +54,8 @@ export function PaperTrades({ trades }: { trades: PaperTrade[] }) {
               <tr key={t.id} style={{ animationDelay: `${i * 45}ms` }}>
                 <td className="mono">{t.id}</td>
                 <td>
-                  <span className="tk-s">{t.ticker}</span>
+                  <span className="tk-s">{t.company}</span>
+                  <span className="ticker-sub"> {t.ticker}</span>
                 </td>
                 <td>
                   <span className={`side ${t.side}`}>{t.side}</span>

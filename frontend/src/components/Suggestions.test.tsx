@@ -5,6 +5,7 @@ import type { Suggestion } from "../api";
 
 const openSug: Suggestion = {
   ticker: "AAPL",
+  company: "Apple Inc",
   consolidated_score: 1.0,
   contributing_signals: { source: "insider_form4", n_contributing: 2 },
   created_at: "2024-01-12",
@@ -19,7 +20,8 @@ afterEach(() => vi.restoreAllMocks());
 
 it("renders an open suggestion with accept/reject controls", () => {
   render(<Suggestions suggestions={[openSug]} onDecided={() => {}} />);
-  expect(screen.getByText("AAPL")).toBeInTheDocument();
+  expect(screen.getByText("Apple Inc")).toBeInTheDocument();      // company name shown
+  expect(screen.getByText(/AAPL/)).toBeInTheDocument();           // ticker as sub-label
   expect(screen.getByRole("button", { name: /accept/i })).toBeInTheDocument();
 });
 

@@ -88,8 +88,8 @@ export function Suggestions({
                   <div className="kitno">{no}</div>
                   <div className="ct-main">
                     <div>
-                      <div className="tk">{s.ticker}</div>
-                      <div className="horizon">{s.horizon} horizon</div>
+                      <div className="company">{s.company}</div>
+                      <div className="ticker-sub">{s.ticker} · {s.horizon}-term</div>
                     </div>
                     <div className={`chip ${s.status}`}>{s.status}</div>
                   </div>

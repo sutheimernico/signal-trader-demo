@@ -12,6 +12,7 @@ export type Decision = "accepted" | "rejected";
 
 export interface Suggestion {
   ticker: string;
+  company: string;
   consolidated_score: number;
   contributing_signals: {
     source: string;
@@ -40,6 +41,7 @@ export interface SourceScore {
 export interface PaperTrade {
   id: number;
   ticker: string;
+  company: string;
   side: string;
   qty: number;
   entry_price: number;
