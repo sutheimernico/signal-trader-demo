@@ -53,7 +53,12 @@ def main() -> None:
     store = SignalStore(config.SQLITE_PATH)
     signals = store.read_signals(source=SOURCE_NAME, start=args.start, end=args.end)
 
-    lines = ["=== Insider Report (all figures after costs) ===", ""]
+    lines = [
+        "=== Insider Report (all figures after costs) ===",
+        "(fills differ by engine: vbt = signal-bar; backtesting.py = next-bar-open"
+        " — vbt enters one bar earlier and looks better on a trend)",
+        "",
+    ]
     for ticker in args.tickers:
         close = close_lookup[ticker]
         ticker_signals = [s for s in signals if s.ticker == ticker]
@@ -80,6 +85,7 @@ def main() -> None:
     score = score_source(
         store, source=SOURCE_NAME, close_lookup=close_lookup,
         horizon=args.horizon, window_label=f"{args.horizon}d", persist=True,
+        start=args.start, end=args.end,
     )
     lines.append("")
     lines.append(

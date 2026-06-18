@@ -21,9 +21,15 @@ def score_source(
     horizon: int = 5,
     window_label: str = "5d",
     persist: bool = False,
+    start: str | None = None,
+    end: str | None = None,
 ) -> SourceScoreRecord:
-    """Compute (and optionally persist) the SourceScore for one source."""
-    signals = store.read_signals(source=source)
+    """Compute (and optionally persist) the SourceScore for one source.
+
+    `start`/`end` (timestamp_known window) must match the window the P&L is
+    reported over, so hit-rate and lag describe the same signal population.
+    """
+    signals = store.read_signals(source=source, start=start, end=end)
     returns: list[float] = []
     lags: list[int] = []
     for sig in signals:
