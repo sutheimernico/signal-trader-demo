@@ -51,3 +51,13 @@ All 6 tasks built TDD, methodology-reviewed, 185 tests green, ruff clean, all of
 **Autonomous paper trading is wired** (`run_ml_experiment.py` without `--no-trade` places top-k Alpaca **paper** orders, no confirmation) but given the model loses to baseline, trading it is not justified by the evaluation — left for Nico to kick off as an experiment.
 
 **Next experiments (would need their own methodology pass):** richer features (volume, cross-sectional rank, fundamentals — point-in-time), better label (rank/IC target), proper hyperparameter search inside the purged CV (no leakage), and a stronger/again-honest baseline.
+
+## Survivorship sensitivity (2026-06-18, autonomous)
+
+Re-ran the retro eval on a broader, less cherry-picked universe (108 names incl.
+decliners/mid-caps via `--broad`):
+- ML +0.00505/rebal (PSR 0.993) vs baseline +0.00361 (PSR 0.974), 630 OOS rebalances → ML still beats baseline.
+- Margin shrank from ~0.23%/rebal (mega-cap-only) to ~0.14% (broad) — edge is NOT pure survivorship artifact, but smaller.
+- **Caveat (honest):** still not a clean survivorship test — yfinance has no data for truly delisted names (WBA/PARA/etc. failed to load), so the universe is still survivors-only. Both PSRs ~0.98 reflect a 14-year bull market; only the ML-vs-baseline margin is meaningful.
+- **Blocked for a clean test:** need a point-in-time index-constituent + delisted-price feed (paid: CRSP/Sharadar/Norgate). Flagged to Nico.
+- Next honest checks: shift-test on the ML position series (timing-leakage robustness); recent-2-month focused readout.
