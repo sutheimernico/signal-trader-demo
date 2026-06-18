@@ -30,10 +30,19 @@ def _to_date(value: object) -> dt.date:
     return dt.date.fromisoformat(str(value)[:10])
 
 
+_TICKER_PLACEHOLDERS = {"", "N/A", "NA", "NONE", "NULL"}
+
+
 def _issuer_ticker(obj, fallback: str) -> str:
-    """Issuer ticker from the real Form4 object (obj.issuer.ticker)."""
+    """Normalized issuer ticker; "" for placeholders/unresolvable (untradeable).
+
+    Strips internal whitespace ('N O G' -> 'NOG') and rejects placeholders like
+    'N/A' that edgartools returns when no ticker resolved.
+    """
     issuer = getattr(obj, "issuer", None)
-    return str(getattr(issuer, "ticker", None) or fallback)
+    raw = getattr(issuer, "ticker", None) or fallback
+    t = str(raw).strip().replace(" ", "").upper()
+    return "" if t in _TICKER_PLACEHOLDERS else t
 
 
 def _is_10b5_1(obj) -> bool:
