@@ -26,12 +26,21 @@ from signal_trader.store.suggestion_store import SuggestionStore
 
 
 def _load_close_lookup(tickers: list[str], start: str, end: str) -> dict[str, pd.Series]:
+    """Best-effort prices: one ticker with no data (foreign/delisted) must not
+    abort the rest. Returns close per ticker that actually has cached data."""
     if not tickers:
         return {}
     service = CacheService(YFinanceProvider(), config.PARQUET_DIR, config.SQLITE_PATH)
-    service.backfill(tickers, start, end)
-    wide = service.load_close_matrix(tickers, start, end)
-    return {t: wide[t].dropna() for t in tickers if t in wide}
+    out: dict[str, pd.Series] = {}
+    for t in tickers:
+        try:
+            service.backfill([t], start, end)
+            wide = service.load_close_matrix([t], start, end)
+            if t in wide:
+                out[t] = wide[t].dropna()
+        except Exception:  # noqa: BLE001 - no price data for this name; skip it
+            continue
+    return out
 
 
 def main() -> None:
@@ -44,12 +53,21 @@ def main() -> None:
     source = ThirteenFSource(identity=config.sec_identity())
     observations = source.fetch_new_long_positions(args.funds)
     tickers = sorted({o.ticker for o in observations})
-    print(f"Fetched {len(observations)} new long position(s) across {len(tickers)} ticker(s)")
-    close_lookup = _load_close_lookup(tickers, args.start, args.end)
+    # Consensus = a ticker newly bought by >= 2 funds. Price only those (the
+    # actionable shortlist); single-fund buys are persisted unpriced.
+    counts: dict[str, set[str]] = {}
+    for o in observations:
+        counts.setdefault(o.ticker, set()).add(o.fund)
+    consensus = sorted(t for t, funds in counts.items() if len(funds) >= 2)
+    print(
+        f"Fetched {len(observations)} new long position(s) across {len(tickers)} "
+        f"ticker(s); {len(consensus)} with >=2-fund consensus: {consensus}"
+    )
+    close_lookup = _load_close_lookup(consensus, args.start, args.end)
     store = SignalStore(config.SQLITE_PATH)
     n = persist_13f_signals(observations, close_lookup, store)
     build_suggestions(store, SuggestionStore(config.SQLITE_PATH), source=SOURCE_NAME)
-    print(f"Persisted {n} consensus 13F signal(s) into {config.SQLITE_PATH}")
+    print(f"Persisted {n} 13F signal(s) into {config.SQLITE_PATH}")
 
 
 if __name__ == "__main__":
