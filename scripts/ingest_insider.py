@@ -38,14 +38,21 @@ def main() -> None:
     args = parser.parse_args()
 
     source = EdgarForm4Source(identity=config.sec_identity())
-    close_lookup = _load_close_lookup(args.tickers, args.start, args.end)
     store = SignalStore(config.SQLITE_PATH)
-    n = build_insider_signals(
-        source, args.tickers, args.start, args.end,
-        close_lookup=close_lookup, store=store,
-        window_days=args.window_days, min_insiders=args.min_insiders,
-    )
-    print(f"Persisted {n} insider signal(s) into {config.SQLITE_PATH}")
+    # Persist per ticker so a long real run is durable and shows progress: a
+    # crash/kill mid-basket keeps the tickers already done (clustering is
+    # per-ticker, so this is equivalent to the batch call).
+    total = 0
+    for ticker in args.tickers:
+        close_lookup = _load_close_lookup([ticker], args.start, args.end)
+        n = build_insider_signals(
+            source, [ticker], args.start, args.end,
+            close_lookup=close_lookup, store=store,
+            window_days=args.window_days, min_insiders=args.min_insiders,
+        )
+        total += n
+        print(f"  {ticker}: +{n} signal(s)  (running total {total})", flush=True)
+    print(f"Persisted {total} insider signal(s) into {config.SQLITE_PATH}")
 
 
 if __name__ == "__main__":
