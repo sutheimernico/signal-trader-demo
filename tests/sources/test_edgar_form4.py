@@ -8,11 +8,17 @@ from signal_trader.sources.edgar_form4 import EdgarForm4Source
 
 
 def _form4_obj(code="P", acq="A", has_plan=False):
+    # Mirrors the real edgartools 5.36.0 Form4 shape: obj.issuer.ticker,
+    # obj.insider_name, obj.position, obj.footnotes (no has_10b5_1_plan flag).
     obj = MagicMock()
-    obj.has_10b5_1_plan = has_plan
+    obj.footnotes = (
+        {"F1": "Shares sold pursuant to a Rule 10b5-1 trading plan."}
+        if has_plan
+        else {}
+    )
     obj.position = "Director"
-    obj.reporting_owner_name = "Jane Doe"
-    obj.issuer_ticker = "AAPL"
+    obj.insider_name = "Jane Doe"
+    obj.issuer = MagicMock(ticker="AAPL")
     obj.market_trades = pd.DataFrame(
         {
             "Date": [pd.Timestamp("2024-01-10")],
