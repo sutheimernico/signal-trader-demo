@@ -31,6 +31,17 @@ CREATE TABLE IF NOT EXISTS signals (
     accession_no    TEXT NOT NULL,
     PRIMARY KEY (source, ticker, timestamp_known, accession_no)
 );
+
+CREATE TABLE IF NOT EXISTS source_scores (
+    source             TEXT NOT NULL,
+    window             TEXT NOT NULL,
+    n_signals          INTEGER NOT NULL,
+    hit_rate           REAL NOT NULL,
+    avg_forward_return REAL NOT NULL,
+    avg_data_lag_days  REAL NOT NULL,
+    updated_at         TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (source, window)
+);
 """
 
 
@@ -49,6 +60,16 @@ class SignalRecord:
     @property
     def accession_no(self) -> str:
         return str(self.raw_payload.get("accession_no", ""))
+
+
+@dataclass(frozen=True)
+class SourceScoreRecord:
+    source: str
+    window: str
+    n_signals: int
+    hit_rate: float
+    avg_forward_return: float
+    avg_data_lag_days: float
 
 
 @dataclass(frozen=True)
@@ -133,4 +154,36 @@ class SignalStore:
                 confidence=row[8],
             )
             for row in rows
+        ]
+
+    def upsert_source_score(self, record: SourceScoreRecord) -> None:
+        with self._connect() as con:
+            con.execute(
+                "INSERT INTO source_scores "
+                "(source, window, n_signals, hit_rate, avg_forward_return, "
+                "avg_data_lag_days) VALUES (?,?,?,?,?,?) "
+                "ON CONFLICT(source, window) DO UPDATE SET "
+                "n_signals=excluded.n_signals, hit_rate=excluded.hit_rate, "
+                "avg_forward_return=excluded.avg_forward_return, "
+                "avg_data_lag_days=excluded.avg_data_lag_days, "
+                "updated_at=datetime('now')",
+                (
+                    record.source, record.window, record.n_signals,
+                    record.hit_rate, record.avg_forward_return,
+                    record.avg_data_lag_days,
+                ),
+            )
+
+    def read_source_scores(self) -> list[SourceScoreRecord]:
+        with self._connect() as con:
+            rows = con.execute(
+                "SELECT source, window, n_signals, hit_rate, avg_forward_return, "
+                "avg_data_lag_days FROM source_scores ORDER BY source, window"
+            ).fetchall()
+        return [
+            SourceScoreRecord(
+                source=r[0], window=r[1], n_signals=r[2], hit_rate=r[3],
+                avg_forward_return=r[4], avg_data_lag_days=r[5],
+            )
+            for r in rows
         ]

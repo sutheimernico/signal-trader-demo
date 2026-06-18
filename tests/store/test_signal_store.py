@@ -70,3 +70,20 @@ def test_duplicate_reinsert_emits_info_log(tmp_path, caplog):
         or "ignored" in r.message.lower()
         for r in caplog.records
     )
+
+
+def test_source_score_upsert_and_read(tmp_path):
+    from signal_trader.store.signal_store import SignalStore, SourceScoreRecord
+    store = SignalStore(tmp_path / "t.sqlite")
+    store.upsert_source_score(SourceScoreRecord(
+        source="insider_form4", window="5d", n_signals=10,
+        hit_rate=0.6, avg_forward_return=0.012, avg_data_lag_days=2.5,
+    ))
+    store.upsert_source_score(SourceScoreRecord(
+        source="insider_form4", window="5d", n_signals=12,
+        hit_rate=0.5, avg_forward_return=0.009, avg_data_lag_days=2.7,
+    ))  # same (source, window) -> replace
+    scores = store.read_source_scores()
+    assert len(scores) == 1
+    assert scores[0].n_signals == 12
+    assert scores[0].avg_data_lag_days == 2.7
