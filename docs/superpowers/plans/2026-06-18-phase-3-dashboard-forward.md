@@ -60,8 +60,13 @@ Starting Track A1 (SuggestionStore + PaperTradeStore) via TDD — unblocked, una
 - A3+A4 `feat(api): FastAPI read endpoints + suggestion decision` — GET /suggestions (?status), /source-scores (data-lag always visible), /paper-trades (?open_only); POST decision. After api-design-review: 422 on malformed date (was 422-vs-404 confusion), contributing_signals returned as parsed object, decision constrained to Literal[accepted,rejected].
 - New deps (spec-mandated): `fastapi==0.137.2`, `uvicorn==0.49.0`, pinned; uv.lock updated.
 
-**Deferred — not started (genuinely blocked, need Nico):**
-- **Track B (Alpaca paper loop)** — blocked on paper API keys in `.env` (PROJECT.md open input). No live calls until keys exist; never in pytest.
-- **Track C (React 19 dashboard)** — needs a `brainstorming` pass on MVP scope (views, server-state lib, build tooling) before its own plan. Wires to the Track A API now standing.
+**Track B (forward paper loop) — OPEN-bridge done, live adapter blocked.**
+- `feat(paper): broker seam + forward loop opening trades from accepted suggestions` — `paper/broker.py` (Broker Protocol + Fill), `paper/loop.py` (open_accepted_suggestions). Accepted suggestions → opened PaperTrades from the ACTUAL broker fill (no idealized price, Spec §8.1), idempotent, PIT-safe. Offline-tested with a fake broker.
+- After methodology review: added `UNIQUE(source_suggestion_id)` DB backstop against double-open, and per-suggestion log+skip so one rejected order doesn't abort the rest.
+- **Still blocked:** live alpaca-py adapter conforming to `Broker` (fill polling) needs paper API keys in `.env`; never in pytest. The **close/exit path** (hold rule → close_trade with exit fill) is the next backend piece but needs a deliberate exit-rule + exit-price-source decision (cached close vs. live poll) — a methodology choice, not improvised.
+
+**Design brief for the UI:** `docs/design/2026-06-18-dashboard-design-brief.md` — self-contained, hand to Claude Design/Artifacts to generate Track C.
+
+**Track C (React 19 dashboard)** — design brief written; needs Nico to run it through a design tool / decide MVP scope. Wires to the Track A API now standing.
 
 **Not done / deferred decisions (api-design-review, proportionate to local single-user scope):** Pydantic response_models (skipped for now — would improve OpenAPI), 204-vs-200 + 409 on idempotent re-decision, decided_at as date (store contract; loses intra-day ordering — fine for paper demo).
