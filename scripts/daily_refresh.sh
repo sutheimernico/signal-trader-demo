@@ -9,4 +9,5 @@ echo "=== daily_refresh $(date) (insider $START..$END) ==="
 uv run python scripts/scan_insider_market.py --start "$START" --end "$END" \
     --min-filings 4 --max-candidates 120 --min-insiders 3 2>&1 | grep -iE "parsed|Persisted" || true
 uv run python scripts/ingest_13f.py 2>&1 | grep -iE "Fetched|consensus|Persisted" || true
+uv run python scripts/ingest_congress.py --years 2026 2025 --max-filings 150 2>&1 | grep -iE "consensus|Persisted" || true
 echo "=== done $(date) ==="
