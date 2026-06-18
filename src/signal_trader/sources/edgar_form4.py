@@ -14,7 +14,7 @@ from __future__ import annotations
 import datetime as dt
 import logging
 
-from edgar import Company, set_identity
+from edgar import Company, get_filings, set_identity
 
 from signal_trader.sources.insider_source import InsiderObservation
 
@@ -83,6 +83,46 @@ class EdgarForm4Source:
                         ticker,
                         exc,
                     )
+        return observations
+
+    def fetch_market_wide(
+        self,
+        start: str,
+        end: str,
+        min_filings: int = 6,
+        max_candidates: int = 200,
+    ) -> list[InsiderObservation]:
+        """Scan ALL Form 4 filings in [start, end] and parse only the issuers
+        with the most filings (candidate clusters), instead of hand-picked
+        tickers. edgartools indexes Form 4 by issuer CIK, so a cluster of insider
+        activity shows up as many filings under one CIK. We parse the top
+        `max_candidates` issuers having >= `min_filings`; the rest are reported as
+        skipped (no silent truncation). The purchase/cluster filters downstream
+        still decide what becomes a signal.
+        """
+        set_identity(self._identity)
+        filings = get_filings(form="4", filing_date=f"{start}:{end}")
+        df = filings.to_pandas()
+        counts = df.groupby("cik").size().sort_values(ascending=False)
+        eligible = counts[counts >= min_filings]
+        candidate_ciks = set(eligible.head(max_candidates).index)
+        skipped = len(eligible) - len(candidate_ciks)
+        if skipped > 0:
+            _LOG.warning(
+                "market scan: %d issuers >= %d filings, parsing top %d, skipping %d",
+                len(eligible), min_filings, len(candidate_ciks), skipped,
+            )
+        observations: list[InsiderObservation] = []
+        for filing in filings:
+            if getattr(filing, "cik", None) not in candidate_ciks:
+                continue
+            try:
+                observations.extend(self._observations_from_filing("", filing))
+            except Exception as exc:  # noqa: BLE001 - log + skip, never truncate silently
+                _LOG.warning(
+                    "skip unparseable Form 4 %s: %s",
+                    getattr(filing, "accession_no", "?"), exc,
+                )
         return observations
 
     def _observations_from_filing(self, ticker, filing) -> list[InsiderObservation]:

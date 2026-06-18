@@ -162,3 +162,27 @@ def test_observation_carries_edgar_source_url():
     ):
         out = EdgarForm4Source(identity="X y@z.com").fetch(["AAPL"], "2024-01-01", "2024-01-31")
     assert out[0].url == "https://www.sec.gov/Archives/edgar/data/1/0001-index.html"
+
+
+def test_market_wide_parses_only_top_candidate_issuers():
+    import pandas as pd
+    # 3 issuers: cik 111 has 3 filings (cluster candidate), 222 has 1, 333 has 1
+    f_a1 = _filing(_form4_obj(), accession="a1"); f_a1.cik = 111
+    f_a2 = _filing(_form4_obj(), accession="a2"); f_a2.cik = 111
+    f_a3 = _filing(_form4_obj(), accession="a3"); f_a3.cik = 111
+    f_b = _filing(_form4_obj(), accession="b1"); f_b.cik = 222
+    f_c = _filing(_form4_obj(), accession="c1"); f_c.cik = 333
+    all_f = [f_a1, f_a2, f_a3, f_b, f_c]
+    fake = MagicMock()
+    fake.__iter__ = lambda self: iter(all_f)
+    fake.to_pandas.return_value = pd.DataFrame(
+        {"cik": [111, 111, 111, 222, 333], "form": ["4"] * 5}
+    )
+    with patch("signal_trader.sources.edgar_form4.set_identity"), patch(
+        "signal_trader.sources.edgar_form4.get_filings", return_value=fake
+    ):
+        out = EdgarForm4Source(identity="X y@z.com").fetch_market_wide(
+            "2024-01-01", "2024-01-31", min_filings=3, max_candidates=10
+        )
+    # only the 3 filings of issuer 111 are parsed (>= min_filings); 222/333 skipped
+    assert len(out) == 3

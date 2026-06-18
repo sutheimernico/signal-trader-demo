@@ -50,6 +50,21 @@ def build_insider_signals(
     means no tilt — unchanged behavior.
     """
     observations = source.fetch(tickers, start, end)
+    return persist_insider_signals(
+        observations, close_lookup, store,
+        window_days=window_days, min_insiders=min_insiders, max_price=max_price,
+    )
+
+
+def persist_insider_signals(
+    observations,
+    close_lookup: dict[str, pd.Series],
+    store: SignalStore,
+    window_days: int = 10,
+    min_insiders: int = 3,
+    max_price: float | None = None,
+) -> int:
+    """Filter, cluster, price, and persist already-fetched observations."""
     purchases = keep_opportunistic(keep_open_market_purchases(observations))
     if max_price is not None:
         purchases = keep_small_cap(purchases, max_price)
