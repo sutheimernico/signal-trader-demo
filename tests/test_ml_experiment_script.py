@@ -4,8 +4,8 @@ from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
-
 import scripts.run_ml_experiment as ml
+
 from signal_trader.paper.broker import Fill
 
 
@@ -14,7 +14,7 @@ class FakeBroker:
         pass
     def submit_market_buy(self, symbol, qty):
         return Fill(order_id="o", symbol=symbol, qty=qty, price=100.0,
-                    filled_at=dt.datetime(2024, 1, 2, 15, tzinfo=dt.timezone.utc),
+                    filled_at=dt.datetime(2024, 1, 2, 15, tzinfo=dt.UTC),
                     side="buy")
 
 

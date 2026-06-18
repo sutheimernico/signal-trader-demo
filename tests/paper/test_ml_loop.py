@@ -15,7 +15,7 @@ class FakeBroker:
     def submit_market_buy(self, symbol, qty):
         self.calls.append(symbol)
         return Fill(order_id=f"o{len(self.calls)}", symbol=symbol, qty=qty,
-                    price=100.0, filled_at=dt.datetime(2024, 1, 2, 15, tzinfo=dt.timezone.utc),
+                    price=100.0, filled_at=dt.datetime(2024, 1, 2, 15, tzinfo=dt.UTC),
                     side="buy")
 
 
