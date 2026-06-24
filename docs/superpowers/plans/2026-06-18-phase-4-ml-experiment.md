@@ -84,33 +84,60 @@ default OFF — the `_add_calendar` opt-in pattern): per `(ticker, t)`, the coun
 (never `timestamp_event`); missing = explicit 0 over existing price rows (no fabricated
 /dropped rows). Leak surface covered by offline fixture tests (as-of leak, missing→0,
 determinism, no cross-ticker bleed); methodology review found nothing invalidating;
-baseline (`mom_col`) never sees the consensus column, so the A/B is fair.
+baseline (`mom_col`) never sees the consensus column, so the *margin* is a fair A/B —
+but note the absolute PSR is overstated (overlapping horizons, below), so only the
+margin vs baseline is believable, not the levels.
 
 **Honest OOS A/B** (local cache, GBDT, SAME purged+embargoed walk-forward, after costs;
 universe = 239 names that have BOTH signals and bars, 2025-01..2026-06, horizon 5,
-top-k 3, 4 folds → 84 OOS rebalances):
+top-k 3, 4 folds → 84 OOS rebalances). Re-run 2026-06-25 with the two sharper
+honesty metrics (diff-PSR, shift-test):
 
-| window | ML +consensus net/rebal | PSR | Δ vs price-only | beats baseline? |
-|--------|------------------------|-----|-----------------|-----------------|
-| 30d | +0.02226 | 0.992 | **+0.00297** | No |
-| 90d | +0.02169 | 0.990 | **+0.00239** | No |
-| 180d | +0.01448 | 0.952 | **−0.00481** | No |
+| window | ML net/rebal | abs PSR ⚠ | Δ vs price-only | **diff-PSR** | **beats baseline?** |
+|--------|-------------|-----------|-----------------|--------------|---------------------|
+| 30d | +0.02226 | 0.992 | +0.00297 ⚠ | 0.161 | **No** |
+| 90d | +0.02169 | 0.990 | +0.00239 ⚠ | 0.113 | **No** |
+| 180d | +0.01448 | 0.952 | −0.00481 | 0.016 | **No** |
 
-price-only ML: **+0.01930**/rebal (PSR 0.982). Momentum baseline: **+0.03399**/rebal
-(PSR 1.000).
+price-only ML: **+0.01930**/rebal, abs PSR 0.982 ⚠, diff-PSR **0.056**, beats baseline **No**.
+Momentum baseline: **+0.03399**/rebal (abs PSR 1.000).
 
-- **The consensus feature does NOT earn a robust OOS edge.** Both ML arms LOSE to the
-  momentum baseline after costs in every window. The small apparent improvement at
-  30/90d **flips sign at 180d** — i.e. the "help" is a window-hyperparameter artifact,
-  not a stable signal (the same trap the calendar-feature lesson flagged). Reported as
-  a learning artifact, not an edge. Feature kept **off by default** accordingly.
+- **The "beats baseline?" column is the ONLY load-bearing figure.** ⚠ = inflated /
+  not believable on its own: the absolute PSRs (~0.95–1.0) are a bull-market artifact
+  (see overlapping-horizon caveat), and the `Δ vs price-only` at 30/90d is a rosinen-
+  pick trap — those `+0.003`/`+0.002` improvements sit on the 1.6%-sparse feature
+  (next bullet) and **flip sign to −0.005 at 180d**, so the "help" is a window-hyper-
+  parameter artifact, not a stable signal (the same trap the calendar-feature lesson
+  flagged). Do not read the Δ without the sparsity caveat attached.
+- **diff-PSR confirms it quantitatively:** PSR of the per-rebalance `ml_net − base_net`
+  difference vs 0 is **< 0.5 in every arm** (0.016–0.161) — i.e. the difference Sharpe
+  is ≤ 0, ML does not robustly beat momentum after costs. This is the believable margin
+  metric; the absolute `ml_psr` is not.
+- **Shift-test (empirical leak probe, 2026-06-25):** re-realizing the SAME ML picks one
+  extra bar later does **NOT collapse** the net-return Sharpe in any arm (e.g. price-only
+  3.70 → 4.55; 180d 2.86 → 3.87; `collapsed=False` throughout). Read this honestly: it
+  is **not** a clean bill of health — there is barely an edge to collapse (ML loses to
+  baseline), so the shift-test is weakly diagnostic here. The Sharpe even nudges *up*
+  under the lag, which is noise on overlapping, regime-driven returns (every pick rides
+  the same bull drift; one bar of offset barely moves it). The structural leak guard
+  (`max(fit)<min(predict)` per fold + purge/embargo) remains the real protection; the
+  shift-test simply finds no *additional* timing leak to flag.
 - **Why the data can't say more (honest limits):** the feature is extremely sparse —
   only **1.6%** of rows are non-zero and almost all of those equal 1 (17 rows = 2), and
   the underlying signals cluster in **2026-05**. At top-k 3 over 239 names the consensus
   column moves the picks on only a handful of dates, so 84 rebalances over one
-  bull-market window is too thin to claim either way. Both PSRs ~0.98–1.0 reflect the
-  regime; only the ML-vs-baseline margin is meaningful.
+  bull-market window is too thin to claim either way.
+- **Overlapping-horizon caveat:** rebalances overlap (each label spans the full horizon,
+  consecutive rebalances share calendar days), so annualized Sharpe and the absolute PSR
+  are overstated (serial correlation, effective n ≪ 84). Fixing this needs non-overlapping
+  rebalancing (Fix 4, M-effort, not done) — until then read the margin, not the levels.
+- **Deflated-Sharpe note (multiple testing):** the +consensus arm was selected over **3
+  windows** (30/90/180d); with several configs tested the absolute PSR overstates
+  significance. No formal DSR gate is applied (per spec, that is broad-strategy-search
+  territory) — but `evaluate_ml` now carries `n_configs_tested` and the CLI prints the
+  note so the multiple-testing cost is on the record.
 - **What a real test would need (Needs Nico):** a denser, longer point-in-time signal
   history (multi-year Form-4/13F/congress backfill, not the current ~250 mostly-2026
-  rows) and window selection done INSIDE the purged CV. With today's cache the feature
+  rows), window selection done INSIDE the purged CV, and non-overlapping rebalancing
+  (Fix 4) so the absolute numbers become trustworthy too. With today's cache the feature
   is plumbing-validated and leakage-safe, but the A/B is underpowered.
