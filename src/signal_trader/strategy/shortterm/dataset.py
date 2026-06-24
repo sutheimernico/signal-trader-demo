@@ -14,6 +14,11 @@ from __future__ import annotations
 
 import pandas as pd
 
+from signal_trader.strategy.shortterm.consensus import (
+    ConsensusSignal,
+    consensus_buyers_known_le_t,
+)
+
 
 def _ticker_frame(
     close: pd.Series, horizon: int, feature_windows: list[int]
@@ -92,8 +97,18 @@ def build_dataset(
     close_by_ticker: dict[str, pd.Series],
     horizon: int = 5,
     feature_windows: list[int] | None = None,
+    consensus_signals: list[ConsensusSignal] | None = None,
+    consensus_window_days: int = 30,
 ) -> tuple[pd.DataFrame, pd.Series]:
-    """Build a point-in-time (X, y) dataset indexed by (ticker, date)."""
+    """Build a point-in-time (X, y) dataset indexed by (ticker, date).
+
+    ``consensus_signals`` is an explicit opt-in (default None = OFF), exactly the
+    ``_add_calendar`` pattern: pass insider/congress/fund buy signals and a
+    backward-window count of distinct point-in-time buyers is appended as
+    ``consensus_buyers_known_le_t``. The join is strictly ``timestamp_known <= t``
+    over the ALREADY-built (dropna'd) price rows, so a bar with no qualifying
+    signal gets an explicit 0 — no fabricated row, no dropped row.
+    """
     windows = feature_windows if feature_windows is not None else [5, 10, 20]
     frames: list[pd.DataFrame] = []
     for ticker, close in close_by_ticker.items():
@@ -106,4 +121,8 @@ def build_dataset(
         return pd.DataFrame(), pd.Series(dtype=float)
     full = pd.concat(frames)
     y = full.pop("__label__")
+    if consensus_signals is not None:
+        full["consensus_buyers_known_le_t"] = consensus_buyers_known_le_t(
+            full.index, consensus_signals, window_days=consensus_window_days
+        )
     return full, y

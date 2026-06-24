@@ -39,6 +39,65 @@ def test_experiment_prints_honest_scorecard_no_trade(tmp_path, monkeypatch, caps
     assert ("BEAT" in out) or ("did NOT beat" in out)
 
 
+def test_consensus_flag_loads_signals_and_labels_scorecard(tmp_path, monkeypatch, capsys):
+    """--consensus opts the point-in-time consensus feature into the SAME OOS A/B
+    and labels the scorecard so the run is self-documenting."""
+    from signal_trader.strategy.shortterm.consensus import ConsensusSignal
+
+    monkeypatch.setattr(ml, "_load_close_lookup", _universe)
+    called = {}
+
+    def fake_load_consensus(tickers, start, end, **kwargs):
+        called["yes"] = True
+        return [ConsensusSignal(ticker="AAA", timestamp_known=dt.date(2023, 2, 1),
+                                source="insider_form4", actor_id="x")]
+
+    monkeypatch.setattr(ml, "_load_consensus_signals", fake_load_consensus)
+    with patch.object(sys, "argv",
+                      ["run_ml_experiment.py", "--tickers", "AAA", "BBB",
+                       "--start", "2023-01-01", "--end", "2024-12-31",
+                       "--horizon", "3", "--n-splits", "2", "--test-size", "10",
+                       "--top-k", "2", "--no-trade", "--consensus"]):
+        ml.main()
+    out = capsys.readouterr().out
+    assert called.get("yes"), "expected --consensus to load consensus signals"
+    assert "consensus" in out.lower()
+
+
+def test_load_consensus_signals_includes_backward_window_before_start(tmp_path, monkeypatch):
+    """The backward window needs signals known BEFORE --start to populate early
+    bars; the loader must widen its read by window_days, else early-bar counts
+    are silently understated (conservative, but it weakens the honest A/B)."""
+    from signal_trader.store.signal_store import SignalRecord, SignalStore
+
+    db = tmp_path / "sig.sqlite"
+    store = SignalStore(db)
+    store.insert_signals([
+        SignalRecord(
+            ticker="AAA", source="insider_form4", signal_type="buy", direction="long",
+            timestamp_event=dt.date(2023, 12, 20), timestamp_known=dt.date(2023, 12, 28),
+            price_at_known=10.0, raw_payload={"accession_no": "pre"}, confidence=0.5,
+        ),  # known 4 days BEFORE start=2024-01-01, inside a 30d window
+    ])
+    monkeypatch.setattr(ml.config, "SQLITE_PATH", db)
+    got = ml._load_consensus_signals(["AAA"], "2024-01-01", "2024-12-31", window_days=30)
+    assert any(s.actor_id == "pre" for s in got), "pre-start signal must be loaded"
+
+
+def test_no_consensus_flag_does_not_load_signals(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(ml, "_load_close_lookup", _universe)
+    called = {"yes": False}
+    monkeypatch.setattr(ml, "_load_consensus_signals",
+                        lambda *a, **k: called.__setitem__("yes", True) or [])
+    with patch.object(sys, "argv",
+                      ["run_ml_experiment.py", "--tickers", "AAA", "BBB",
+                       "--start", "2023-01-01", "--end", "2024-12-31",
+                       "--horizon", "3", "--n-splits", "2", "--test-size", "10",
+                       "--top-k", "2", "--no-trade"]):
+        ml.main()
+    assert called["yes"] is False  # default OFF: never touches the signal store
+
+
 def test_experiment_opens_autonomous_paper_trades(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(ml, "_load_close_lookup", _universe)
     monkeypatch.setattr(ml, "AlpacaPaperBroker", FakeBroker)

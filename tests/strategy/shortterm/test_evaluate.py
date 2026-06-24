@@ -1,7 +1,10 @@
+import datetime as dt
+
 import numpy as np
 import pandas as pd
 
 from signal_trader.backtest.costs import CostModel
+from signal_trader.strategy.shortterm.consensus import ConsensusSignal
 from signal_trader.strategy.shortterm.evaluate import evaluate_ml
 
 _COST = CostModel(commission_per_trade=0.0005, slippage=0.0005)
@@ -83,3 +86,49 @@ def test_each_fold_trains_strictly_before_it_predicts():
     assert active, "expected at least one fold to predict"
     for d in active:
         assert max(d.fit_dates) < min(d.predict_dates)  # no train-on-test, with gap
+
+
+def test_consensus_signals_flow_into_the_feature_matrix_when_opted_in():
+    """A/B opt-in path: when consensus_signals are passed, the forecaster sees the
+    consensus column; without them it does not. Same folds/costs either way."""
+    universe = _universe()
+    seen_cols: list[set] = []
+
+    class ColSpy:
+        def fit(self, X, y):
+            seen_cols.append(set(X.columns))
+        def predict(self, X):
+            return np.zeros(len(X))
+
+    # signals known on a date inside the dataset range, for tickers that exist
+    signals = [
+        ConsensusSignal(ticker="T0", timestamp_known=dt.date(2023, 2, 1),
+                        source="insider_form4", actor_id="x"),
+        ConsensusSignal(ticker="T1", timestamp_known=dt.date(2023, 2, 1),
+                        source="congress_house", actor_id="y"),
+    ]
+    evaluate_ml(
+        universe, horizon=3, feature_windows=[5, 10], n_splits=2, test_size=8,
+        top_k=2, cost_model=_COST, forecaster_factory=ColSpy,
+        consensus_signals=signals, consensus_window_days=365,
+    )
+    assert seen_cols, "expected at least one fold to fit"
+    assert all("consensus_buyers_known_le_t" in cols for cols in seen_cols)
+
+
+def test_no_consensus_column_without_signals():
+    universe = _universe()
+    seen_cols: list[set] = []
+
+    class ColSpy:
+        def fit(self, X, y):
+            seen_cols.append(set(X.columns))
+        def predict(self, X):
+            return np.zeros(len(X))
+
+    evaluate_ml(
+        universe, horizon=3, feature_windows=[5, 10], n_splits=2, test_size=8,
+        top_k=2, cost_model=_COST, forecaster_factory=ColSpy,
+    )
+    assert seen_cols
+    assert all("consensus_buyers_known_le_t" not in cols for cols in seen_cols)

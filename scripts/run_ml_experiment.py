@@ -11,6 +11,8 @@ confirmation; paper money only, separate from the human insider track).
 from __future__ import annotations
 
 import argparse
+import datetime as dt
+import json
 
 import pandas as pd
 
@@ -21,11 +23,15 @@ from signal_trader.paper.alpaca.broker_adapter import AlpacaPaperBroker
 from signal_trader.paper.ml_loop import open_ml_positions
 from signal_trader.store.cache_service import CacheService
 from signal_trader.store.paper_trade_store import PaperTradeStore
+from signal_trader.store.signal_store import SignalStore
+from signal_trader.strategy.shortterm.consensus import ConsensusSignal
 from signal_trader.strategy.shortterm.dataset import build_dataset, latest_features
 from signal_trader.strategy.shortterm.evaluate import evaluate_ml
 from signal_trader.strategy.shortterm.model import GBDTForecaster
 
 _FEATURE_WINDOWS = [5, 10, 20]
+# Sources persisted by Phase-1/3 ingest; read-only here.
+_CONSENSUS_SOURCES = ("insider_form4", "congress_house", "superinvestor_13f")
 
 
 def _load_close_lookup(tickers: list[str], start: str, end: str) -> dict[str, pd.Series]:
@@ -33,6 +39,39 @@ def _load_close_lookup(tickers: list[str], start: str, end: str) -> dict[str, pd
     service.backfill(tickers, start, end)
     wide = service.load_close_matrix(tickers, start, end)
     return {t: wide[t].dropna() for t in tickers if t in wide}
+
+
+def _load_consensus_signals(
+    tickers: list[str], start: str, end: str, window_days: int = 30
+) -> list[ConsensusSignal]:
+    """Read persisted buy signals (point-in-time) for the universe, read-only.
+
+    actor_id is the filing accession number — the most specific distinct-buyer
+    id the store carries (see consensus.py). Only known dates are used.
+
+    The read window is widened by ``window_days`` before ``start`` so the
+    backward-window count of the earliest evaluation bars is fully populated;
+    without it those counts would be silently understated (conservative, but it
+    weakens the A/B). ``end`` is kept as-is — never reading past the data range.
+    """
+    read_start = (dt.date.fromisoformat(start) - dt.timedelta(days=window_days)).isoformat()
+    store = SignalStore(config.SQLITE_PATH)
+    wanted = set(tickers)
+    out: list[ConsensusSignal] = []
+    for source in _CONSENSUS_SOURCES:
+        for s in store.read_signals(source, start=read_start, end=end):
+            if s.ticker not in wanted:
+                continue
+            accession = str(json.loads(s.raw_payload_json).get("accession_no", ""))
+            out.append(
+                ConsensusSignal(
+                    ticker=s.ticker,
+                    timestamp_known=s.timestamp_known,
+                    source=s.source,
+                    actor_id=accession or f"{s.source}:{s.timestamp_known}",
+                )
+            )
+    return out
 
 
 def main() -> None:
@@ -47,19 +86,41 @@ def main() -> None:
     parser.add_argument("--commission", type=float, default=0.001)
     parser.add_argument("--slippage", type=float, default=0.0005)
     parser.add_argument("--no-trade", action="store_true")
+    parser.add_argument(
+        "--consensus", action="store_true",
+        help="opt in the point-in-time insider/congress/fund consensus feature "
+             "(default OFF); runs the SAME OOS A/B with the extra column",
+    )
+    parser.add_argument("--consensus-window", type=int, default=30,
+                        help="backward window (CALENDAR days) for the consensus count")
     args = parser.parse_args()
 
     cost = CostModel(commission_per_trade=args.commission, slippage=args.slippage)
     universe = _load_close_lookup(args.tickers, args.start, args.end)
 
+    consensus_signals = (
+        _load_consensus_signals(
+            args.tickers, args.start, args.end, window_days=args.consensus_window
+        )
+        if args.consensus else None
+    )
+    feature_mode = (
+        f"+consensus (window={args.consensus_window}d, "
+        f"{len(consensus_signals)} signals)"
+        if args.consensus else "price-only"
+    )
+
     res = evaluate_ml(
         universe, horizon=args.horizon, feature_windows=_FEATURE_WINDOWS,
         n_splits=args.n_splits, test_size=args.test_size, top_k=args.top_k,
         cost_model=cost, forecaster_factory=GBDTForecaster,
+        consensus_signals=consensus_signals,
+        consensus_window_days=args.consensus_window,
     )
     verdict = "BEAT" if res["beat_baseline"] else "did NOT beat"
     lines = [
         "=== ML experiment (OOS, after costs — honest measurement, not edge) ===",
+        f"features={feature_mode}",
         f"rebalances={res['n_rebalances']}  horizon={args.horizon}  top_k={args.top_k}",
         f"ML       mean net/rebal={res['ml_mean_net']:.4f}  PSR={res['ml_psr']:.3f}",
         f"Baseline mean net/rebal={res['baseline_mean_net']:.4f}  PSR={res['baseline_psr']:.3f}",

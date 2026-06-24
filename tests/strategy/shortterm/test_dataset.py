@@ -1,11 +1,21 @@
+import datetime as dt
+
 import pandas as pd
 
+from signal_trader.strategy.shortterm.consensus import ConsensusSignal
 from signal_trader.strategy.shortterm.dataset import build_dataset
 
 
 def _close(values):
     idx = pd.date_range("2024-01-01", periods=len(values), freq="B")
     return pd.Series([float(v) for v in values], index=idx)
+
+
+def _csig(ticker, known, source="insider_form4", actor="a"):
+    return ConsensusSignal(
+        ticker=ticker, timestamp_known=dt.date.fromisoformat(known),
+        source=source, actor_id=actor,
+    )
 
 
 def test_label_is_forward_return_entry_next_bar_over_horizon():
@@ -56,3 +66,58 @@ def test_interior_nan_price_drops_rows_never_fabricates_zero_vol():
     # no fabricated rows, no zero-vol smuggled in around the gap
     assert not X.isna().any().any()
     assert (X["vol_2"] > 0).all()
+
+
+# --- opt-in consensus feature (same _add_calendar opt-in pattern, default OFF) ---
+
+_CLOSE12 = [100, 102, 101, 103, 105, 104, 106, 108, 107, 109, 111, 110]
+
+
+def test_consensus_feature_off_by_default():
+    close = _close(_CLOSE12)
+    X, _ = build_dataset({"AAA": close}, horizon=2, feature_windows=[2, 3])
+    assert "consensus_buyers_known_le_t" not in X.columns
+
+
+def test_consensus_feature_added_only_when_signals_passed():
+    close = _close(_CLOSE12)
+    signals = [_csig("AAA", "2024-01-01", actor="x")]
+    X, _ = build_dataset(
+        {"AAA": close}, horizon=2, feature_windows=[2, 3],
+        consensus_signals=signals, consensus_window_days=365,
+    )
+    assert "consensus_buyers_known_le_t" in X.columns
+    # one buyer known well before every retained bar -> all rows count >= 1
+    assert (X["consensus_buyers_known_le_t"] >= 1).all()
+
+
+def test_consensus_feature_is_point_in_time_no_forward_leak():
+    """Dataset-level as-of guard: a signal known the day AFTER a bar must not
+    raise that bar's consensus count."""
+    close = _close(_CLOSE12)
+    # signal known on the 6th business day; bars strictly before it must read 0
+    dates = close.index
+    known_day = dates[5].date().isoformat()
+    X, _ = build_dataset(
+        {"AAA": close}, horizon=2, feature_windows=[2, 3],
+        consensus_signals=[_csig("AAA", known_day, actor="x")],
+        consensus_window_days=365,
+    )
+    col = X["consensus_buyers_known_le_t"]
+    for (_ticker, date), val in col.items():
+        if date < dates[5]:
+            assert val == 0, f"forward leak: bar {date} saw a signal known at {known_day}"
+        else:
+            assert val == 1
+
+
+def test_consensus_missing_signals_zero_without_dropping_or_fabricating_rows():
+    close = _close(_CLOSE12)
+    base_X, _ = build_dataset({"AAA": close}, horizon=2, feature_windows=[2, 3])
+    X, _ = build_dataset(
+        {"AAA": close}, horizon=2, feature_windows=[2, 3],
+        consensus_signals=[], consensus_window_days=30,
+    )
+    # exact same rows as the price-only build: no row dropped, none fabricated
+    assert list(X.index) == list(base_X.index)
+    assert (X["consensus_buyers_known_le_t"] == 0).all()

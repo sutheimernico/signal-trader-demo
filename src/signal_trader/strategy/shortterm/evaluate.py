@@ -23,6 +23,7 @@ import pandas as pd
 from signal_trader.backtest.costs import CostModel
 from signal_trader.backtest.metrics import probabilistic_sharpe_ratio
 from signal_trader.backtest.validation import purged_walk_forward
+from signal_trader.strategy.shortterm.consensus import ConsensusSignal
 from signal_trader.strategy.shortterm.dataset import build_dataset
 from signal_trader.strategy.shortterm.model import Forecaster
 
@@ -43,9 +44,22 @@ def evaluate_ml(
     cost_model: CostModel,
     forecaster_factory: Callable[[], Forecaster],
     embargo: int = 1,
+    consensus_signals: list[ConsensusSignal] | None = None,
+    consensus_window_days: int = 30,
 ) -> dict:
-    """Run purged walk-forward OOS evaluation; return an honest scorecard dict."""
-    X, y = build_dataset(close_by_ticker, horizon=horizon, feature_windows=feature_windows)
+    """Run purged walk-forward OOS evaluation; return an honest scorecard dict.
+
+    The momentum baseline is computed from price momentum alone and never sees
+    the consensus column, so the same folds/costs give a fair price-only-vs-+
+    consensus A/B: run this twice with and without ``consensus_signals``.
+    """
+    X, y = build_dataset(
+        close_by_ticker,
+        horizon=horizon,
+        feature_windows=feature_windows,
+        consensus_signals=consensus_signals,
+        consensus_window_days=consensus_window_days,
+    )
     date_level = X.index.get_level_values("date")
     dates = pd.Index(sorted(date_level.unique()))
     folds = purged_walk_forward(

@@ -73,3 +73,44 @@ OOS eval (108 names, 630 rebalances):
   discipline, calendar features were DISABLED (helper kept, off by default). This
   is the empirical proof that "max parameters" backfires; complexity must earn
   its place on the OOS test, not in-sample.
+
+## Insider/congress/fund consensus feature (2026-06-25, autonomous)
+
+Added an **opt-in, point-in-time** consensus feature (`strategy/shortterm/consensus.py`,
+wired into `build_dataset`/`evaluate_ml`/`run_ml_experiment.py` behind `--consensus`,
+default OFF — the `_add_calendar` opt-in pattern): per `(ticker, t)`, the count of
+**distinct buyers** (insider/congress/fund, keyed by `(source, accession_no)`) whose
+`timestamp_known` falls in `(t − window, t]`. As-of join on `timestamp_known` only
+(never `timestamp_event`); missing = explicit 0 over existing price rows (no fabricated
+/dropped rows). Leak surface covered by offline fixture tests (as-of leak, missing→0,
+determinism, no cross-ticker bleed); methodology review found nothing invalidating;
+baseline (`mom_col`) never sees the consensus column, so the A/B is fair.
+
+**Honest OOS A/B** (local cache, GBDT, SAME purged+embargoed walk-forward, after costs;
+universe = 239 names that have BOTH signals and bars, 2025-01..2026-06, horizon 5,
+top-k 3, 4 folds → 84 OOS rebalances):
+
+| window | ML +consensus net/rebal | PSR | Δ vs price-only | beats baseline? |
+|--------|------------------------|-----|-----------------|-----------------|
+| 30d | +0.02226 | 0.992 | **+0.00297** | No |
+| 90d | +0.02169 | 0.990 | **+0.00239** | No |
+| 180d | +0.01448 | 0.952 | **−0.00481** | No |
+
+price-only ML: **+0.01930**/rebal (PSR 0.982). Momentum baseline: **+0.03399**/rebal
+(PSR 1.000).
+
+- **The consensus feature does NOT earn a robust OOS edge.** Both ML arms LOSE to the
+  momentum baseline after costs in every window. The small apparent improvement at
+  30/90d **flips sign at 180d** — i.e. the "help" is a window-hyperparameter artifact,
+  not a stable signal (the same trap the calendar-feature lesson flagged). Reported as
+  a learning artifact, not an edge. Feature kept **off by default** accordingly.
+- **Why the data can't say more (honest limits):** the feature is extremely sparse —
+  only **1.6%** of rows are non-zero and almost all of those equal 1 (17 rows = 2), and
+  the underlying signals cluster in **2026-05**. At top-k 3 over 239 names the consensus
+  column moves the picks on only a handful of dates, so 84 rebalances over one
+  bull-market window is too thin to claim either way. Both PSRs ~0.98–1.0 reflect the
+  regime; only the ML-vs-baseline margin is meaningful.
+- **What a real test would need (Needs Nico):** a denser, longer point-in-time signal
+  history (multi-year Form-4/13F/congress backfill, not the current ~250 mostly-2026
+  rows) and window selection done INSIDE the purged CV. With today's cache the feature
+  is plumbing-validated and leakage-safe, but the A/B is underpowered.
