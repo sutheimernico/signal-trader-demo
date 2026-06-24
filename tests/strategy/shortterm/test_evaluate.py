@@ -132,3 +132,75 @@ def test_no_consensus_column_without_signals():
     )
     assert seen_cols
     assert all("consensus_buyers_known_le_t" not in cols for cols in seen_cols)
+
+
+def test_scorecard_reports_shift_test_and_diff_psr_fields():
+    """The honest scorecard must carry the empirical leak check (shift_test on
+    the ML pick series) and the robust margin metric (PSR of ml_net - base_net),
+    not just the regime-inflated absolute PSR."""
+    universe = _universe()
+    from signal_trader.strategy.shortterm.dataset import build_dataset
+    _, y_all = build_dataset(universe, horizon=3, feature_windows=[5, 10])
+    res = evaluate_ml(
+        universe, horizon=3, feature_windows=[5, 10], n_splits=2, test_size=8,
+        top_k=2, cost_model=_COST, forecaster_factory=lambda: PerfectForecaster(y_all),
+    )
+    assert set(res["ml_shift_test"]) == {"baseline", "shifted", "collapsed"}
+    assert isinstance(res["ml_shift_test"]["collapsed"], bool)
+    assert isinstance(res["diff_psr"], float)
+    assert 0.0 <= res["diff_psr"] <= 1.0
+    # n_configs_tested is carried for the deflated-Sharpe / multiple-testing note
+    assert res["n_configs_tested"] >= 1
+
+
+def test_shift_test_collapses_for_a_foresight_ranker():
+    """A ranker that picks on the TRUE forward label has an edge that is pure
+    timing: shifting the realized return one extra bar must collapse it. This is
+    the empirical counterpart to the structural max(fit)<min(predict) argument."""
+    universe = _universe()
+    from signal_trader.strategy.shortterm.dataset import build_dataset
+    _, y_all = build_dataset(universe, horizon=3, feature_windows=[5, 10])
+    res = evaluate_ml(
+        universe, horizon=3, feature_windows=[5, 10], n_splits=2, test_size=8,
+        top_k=2, cost_model=_COST, forecaster_factory=lambda: PerfectForecaster(y_all),
+    )
+    # the foresight edge is large unlagged and must not survive the extra lag
+    assert abs(res["ml_shift_test"]["baseline"]) > abs(res["ml_shift_test"]["shifted"])
+    assert res["ml_shift_test"]["collapsed"] is True
+
+
+def test_diff_psr_below_half_when_ml_loses_to_baseline():
+    """When ML does not beat the baseline, the honest margin metric — PSR of the
+    difference series against 0 — must be < 0.5 (the difference Sharpe is <= 0).
+    A zero-prediction ranker reliably loses to momentum after costs."""
+    universe = _universe()
+
+    class ZeroForecaster:
+        def fit(self, X, y):
+            pass
+        def predict(self, X):
+            return np.zeros(len(X))
+
+    res = evaluate_ml(
+        universe, horizon=3, feature_windows=[5, 10], n_splits=2, test_size=8,
+        top_k=2, cost_model=_COST, forecaster_factory=ZeroForecaster,
+    )
+    assert res["beat_baseline"] is False
+    assert res["diff_psr"] < 0.5
+
+
+def test_n_configs_tested_is_propagated():
+    universe = _universe()
+
+    class ZeroForecaster:
+        def fit(self, X, y):
+            pass
+        def predict(self, X):
+            return np.zeros(len(X))
+
+    res = evaluate_ml(
+        universe, horizon=3, feature_windows=[5, 10], n_splits=2, test_size=8,
+        top_k=2, cost_model=_COST, forecaster_factory=ZeroForecaster,
+        n_configs_tested=3,
+    )
+    assert res["n_configs_tested"] == 3

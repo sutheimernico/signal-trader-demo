@@ -34,6 +34,22 @@ def oos_split(
     return series.iloc[:cut], series.iloc[cut:]
 
 
+def sharpe_collapsed(baseline: float, shifted: float, threshold: float = 0.5) -> bool:
+    """Shared collapse rule for shift-style leak tests.
+
+    A genuine edge survives an extra bar of lag; a contemporaneous/future leak
+    loses most of it. ``collapsed`` is True when the lagged (``shifted``) Sharpe
+    falls to at most ``threshold`` of the unlagged (``baseline``) Sharpe in
+    absolute terms. With a zero baseline there is no edge to lose, so it is
+    collapsed iff the shifted Sharpe is also zero. Factored out so the
+    cross-sectional ML pick series (evaluate.py) and the time-series signal path
+    apply the SAME definition of "collapsed".
+    """
+    if baseline == 0:
+        return shifted == 0
+    return abs(shifted) <= threshold * abs(baseline)
+
+
 def shift_test(
     signal: pd.Series,
     returns: pd.Series,
@@ -66,10 +82,7 @@ def shift_test(
     shifted = float(
         qs.stats.sharpe(shifted_series, rf=0.0, periods=TRADING_DAYS_PER_YEAR)
     )
-    if baseline == 0:
-        collapsed = shifted == 0
-    else:
-        collapsed = abs(shifted) <= collapse_threshold * abs(baseline)
+    collapsed = sharpe_collapsed(baseline, shifted, collapse_threshold)
     return {"baseline": baseline, "shifted": shifted, "collapsed": collapsed}
 
 

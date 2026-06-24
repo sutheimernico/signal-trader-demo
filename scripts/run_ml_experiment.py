@@ -118,6 +118,12 @@ def main() -> None:
         consensus_window_days=args.consensus_window,
     )
     verdict = "BEAT" if res["beat_baseline"] else "did NOT beat"
+    shift = res["ml_shift_test"]
+    collapse_note = (
+        "edge collapses under +1 bar lag (timing-leak suspect)"
+        if shift["collapsed"]
+        else "no material collapse"
+    )
     lines = [
         "=== ML experiment (OOS, after costs — honest measurement, not edge) ===",
         f"features={feature_mode}",
@@ -125,6 +131,14 @@ def main() -> None:
         f"ML       mean net/rebal={res['ml_mean_net']:.4f}  PSR={res['ml_psr']:.3f}",
         f"Baseline mean net/rebal={res['baseline_mean_net']:.4f}  PSR={res['baseline_psr']:.3f}",
         f"=> ML {verdict} the momentum baseline after costs.",
+        "--- honesty checks (the only believable figures) ---",
+        f"diff-PSR (ML-baseline vs 0)={res['diff_psr']:.3f}  "
+        "(>0.5 = ML robustly ahead; absolute PSR above is regime-inflated)",
+        f"shift-test (ML picks, +1 bar): Sharpe {shift['baseline']:.2f} -> "
+        f"{shift['shifted']:.2f}  [{collapse_note}]",
+        f"deflated-Sharpe note: {res['n_configs_tested']} configuration(s) tested; "
+        "with multiple windows/configs the absolute PSR overstates significance "
+        "(no formal DSR gate — broad-search territory).",
     ]
 
     if not args.no_trade:

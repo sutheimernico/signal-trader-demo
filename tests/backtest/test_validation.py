@@ -61,6 +61,17 @@ def test_shift_test_returns_both_sharpes_and_a_collapse_flag():
     assert isinstance(res["collapsed"], bool)
 
 
+def test_sharpe_collapsed_helper_matches_threshold_semantics():
+    # The shared collapse rule: shifted edge <= threshold * baseline edge.
+    from signal_trader.backtest.validation import sharpe_collapsed
+
+    assert sharpe_collapsed(baseline=2.0, shifted=0.5, threshold=0.5) is True
+    assert sharpe_collapsed(baseline=2.0, shifted=1.5, threshold=0.5) is False
+    # zero baseline: collapsed iff shifted is also zero (no edge to lose)
+    assert sharpe_collapsed(baseline=0.0, shifted=0.0, threshold=0.5) is True
+    assert sharpe_collapsed(baseline=0.0, shifted=0.3, threshold=0.5) is False
+
+
 def test_anchored_walk_forward_windows_expand_and_are_ordered():
     close = _close(n=300)
     windows = anchored_walk_forward(close, n_splits=3, test_size=50)
