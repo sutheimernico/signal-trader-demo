@@ -35,6 +35,10 @@ from signal_trader.config import TRADING_DAYS_PER_YEAR
 from signal_trader.strategy.shortterm.consensus import ConsensusSignal
 from signal_trader.strategy.shortterm.dataset import build_dataset
 from signal_trader.strategy.shortterm.model import Forecaster
+from signal_trader.strategy.shortterm.survivorship import (
+    DelistingEvent,
+    apply_delisting_haircut,
+)
 
 
 def _top_k_indices(scores: np.ndarray, k: int) -> np.ndarray:
@@ -91,6 +95,8 @@ def evaluate_ml(
     consensus_signals: list[ConsensusSignal] | None = None,
     consensus_window_days: int = 30,
     n_configs_tested: int = 1,
+    delisting_events: list[DelistingEvent] | None = None,
+    delisting_haircut: float | None = None,
 ) -> dict:
     """Run purged walk-forward OOS evaluation; return an honest scorecard dict.
 
@@ -107,6 +113,16 @@ def evaluate_ml(
       against 0 — the only margin metric that is not inflated by the bull-market
       regime (the absolute ``ml_psr``/``baseline_psr`` are). ``n_configs_tested``
       is carried through for the deflated-Sharpe / multiple-testing note.
+
+    Survivorship stress (opt-in, default OFF — the ``consensus_signals`` pattern):
+    pass ``delisting_events`` + ``delisting_haircut`` to overwrite the realized
+    label of any universe name on/after its delisting became knowable with the
+    haircut (point-in-time, no lookahead). Both the headline label and the
+    shift-test's lagged label are shaded so the two stay coherent; the baseline
+    eats the SAME haircut (it ranks the same shaded labels), so the margin stays
+    a fair A/B. ``n_delisted_in_universe`` reports how many universe names were
+    actually shaded — only names present in BOTH the universe and the delisting
+    list can be (the documented partial-correction limit).
     """
     X, y = build_dataset(
         close_by_ticker,
@@ -117,6 +133,15 @@ def evaluate_ml(
     )
     y_lagged = _lagged_forward_label(close_by_ticker, horizon=horizon, extra_lag=1)
     y_lagged = y_lagged.reindex(X.index)  # align row-for-row; missing -> NaN
+
+    n_delisted_in_universe = 0
+    if delisting_events and delisting_haircut is not None:
+        universe_tickers = set(X.index.get_level_values("ticker").unique())
+        in_universe = [e for e in delisting_events if e.ticker in universe_tickers]
+        n_delisted_in_universe = len({e.ticker for e in in_universe})
+        # Shade both labels so the shift-test sees the same stressed picks.
+        y = apply_delisting_haircut(y, in_universe, delisting_haircut)
+        y_lagged = apply_delisting_haircut(y_lagged, in_universe, delisting_haircut)
     date_level = X.index.get_level_values("date")
     dates = pd.Index(sorted(date_level.unique()))
     folds = purged_walk_forward(
@@ -182,5 +207,7 @@ def evaluate_ml(
             "collapsed": sharpe_collapsed(shift_baseline, shift_lagged),
         },
         "n_configs_tested": n_configs_tested,
+        "delisting_haircut": delisting_haircut,
+        "n_delisted_in_universe": n_delisted_in_universe,
         "beat_baseline": bool(ml_mean > base_mean),
     }

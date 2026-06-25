@@ -18,6 +18,8 @@ PARQUET_DIR = DATA_DIR / "bars"
 SQLITE_PATH = DATA_DIR / "signal_trader.sqlite"
 CONFIG_DIR = REPO_ROOT / "config"
 SP500_SNAPSHOT = CONFIG_DIR / "sp500_snapshot.csv"
+# Cached FREE delisting list (SEC Form 25/25-NSE) for the survivorship stress test.
+DELISTINGS_CSV = DATA_DIR / "delistings.csv"
 
 DEFAULT_START = "2016-01-01"
 DEFAULT_END = "2026-01-01"

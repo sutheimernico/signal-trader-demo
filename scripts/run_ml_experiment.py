@@ -18,6 +18,7 @@ import pandas as pd
 
 from signal_trader import config
 from signal_trader.backtest.costs import CostModel
+from signal_trader.market_data.delistings import load_delistings_csv
 from signal_trader.market_data.provider import YFinanceProvider
 from signal_trader.paper.alpaca.broker_adapter import AlpacaPaperBroker
 from signal_trader.paper.ml_loop import open_ml_positions
@@ -28,6 +29,7 @@ from signal_trader.strategy.shortterm.consensus import ConsensusSignal
 from signal_trader.strategy.shortterm.dataset import build_dataset, latest_features
 from signal_trader.strategy.shortterm.evaluate import evaluate_ml
 from signal_trader.strategy.shortterm.model import GBDTForecaster
+from signal_trader.strategy.shortterm.survivorship import DelistingEvent
 
 _FEATURE_WINDOWS = [5, 10, 20]
 # Sources persisted by Phase-1/3 ingest; read-only here.
@@ -74,6 +76,17 @@ def _load_consensus_signals(
     return out
 
 
+def _load_delisting_events(tickers: list[str]) -> list[DelistingEvent]:
+    """Load the cached FREE delisting list, restricted to the universe.
+
+    Only names that are in BOTH the universe AND the delisting list can be shaded
+    (the documented partial-correction limit), so we filter here to keep the
+    scorecard count honest. Missing cache -> empty list (offline-safe).
+    """
+    wanted = set(tickers)
+    return [e for e in load_delistings_csv(config.DELISTINGS_CSV) if e.ticker in wanted]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Autonomous ML paper experiment")
     parser.add_argument("--tickers", nargs="+", required=True)
@@ -93,6 +106,17 @@ def main() -> None:
     )
     parser.add_argument("--consensus-window", type=int, default=30,
                         help="backward window (CALENDAR days) for the consensus count")
+    parser.add_argument(
+        "--survivorship-stress", action="store_true",
+        help="opt in the FREE synthetic-delisting robustness test (default OFF): "
+             "punish any universe name on/after its SEC-filed delisting with "
+             "--delisting-haircut, then re-run the SAME OOS walk-forward",
+    )
+    parser.add_argument(
+        "--delisting-haircut", type=float, default=-0.60,
+        help="forward-return assigned to a delisted name's picks (e.g. -0.60; "
+             "-1.0 = total loss). Transparent assumption — sweep it for a band",
+    )
     args = parser.parse_args()
 
     cost = CostModel(commission_per_trade=args.commission, slippage=args.slippage)
@@ -110,12 +134,19 @@ def main() -> None:
         if args.consensus else "price-only"
     )
 
+    delisting_events = (
+        _load_delisting_events(args.tickers) if args.survivorship_stress else None
+    )
+    delisting_haircut = args.delisting_haircut if args.survivorship_stress else None
+
     res = evaluate_ml(
         universe, horizon=args.horizon, feature_windows=_FEATURE_WINDOWS,
         n_splits=args.n_splits, test_size=args.test_size, top_k=args.top_k,
         cost_model=cost, forecaster_factory=GBDTForecaster,
         consensus_signals=consensus_signals,
         consensus_window_days=args.consensus_window,
+        delisting_events=delisting_events,
+        delisting_haircut=delisting_haircut,
     )
     verdict = "BEAT" if res["beat_baseline"] else "did NOT beat"
     shift = res["ml_shift_test"]
@@ -140,6 +171,23 @@ def main() -> None:
         "with multiple windows/configs the absolute PSR overstates significance "
         "(no formal DSR gate — broad-search territory).",
     ]
+    if args.survivorship_stress:
+        lines += [
+            "--- survivorship stress (FREE synthetic-delisting test) ---",
+            f"haircut={res['delisting_haircut']:.2f} applied point-in-time to "
+            f"{res['n_delisted_in_universe']} universe name(s) on/after their "
+            "SEC-filed delisting.",
+            "PARTIAL & conservative: only names in BOTH the universe AND the free "
+            "SEC delisting list can be shaded; a clean test needs paid delisted "
+            "prices (CRSP/Sharadar — Needs Nico). Form 25 mixes M&A/voluntary with "
+            "bankruptcy, so a shaded name 'left the listing', not 'went bankrupt'.",
+        ]
+        if res["n_delisted_in_universe"] == 0:
+            lines.append(
+                "NOTE: 0 universe names matched the cached delisting list — refresh "
+                "data/delistings.csv (scripts/ingest_delistings.py) or widen the "
+                "universe to include names that later delisted."
+            )
 
     if not args.no_trade:
         # Train on all labelled history, then act on today's point-in-time features.

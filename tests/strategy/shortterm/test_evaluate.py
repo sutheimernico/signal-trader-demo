@@ -6,6 +6,7 @@ import pandas as pd
 from signal_trader.backtest.costs import CostModel
 from signal_trader.strategy.shortterm.consensus import ConsensusSignal
 from signal_trader.strategy.shortterm.evaluate import evaluate_ml
+from signal_trader.strategy.shortterm.survivorship import DelistingEvent
 
 _COST = CostModel(commission_per_trade=0.0005, slippage=0.0005)
 
@@ -204,3 +205,64 @@ def test_n_configs_tested_is_propagated():
         n_configs_tested=3,
     )
     assert res["n_configs_tested"] == 3
+
+
+def test_survivorship_stress_shades_a_foresight_ranker_picks():
+    """Adversarial survivorship stress: a perfect-foresight ranker that would
+    otherwise top-pick a (survivor) name is forced to eat the delisting haircut
+    once that name's exit was knowable. The stressed net return must drop below
+    the unstressed one — proof the haircut bites the picks, point-in-time."""
+    universe = _universe()
+    from signal_trader.strategy.shortterm.dataset import build_dataset
+    _, y_all = build_dataset(universe, horizon=3, feature_windows=[5, 10])
+    common = dict(
+        horizon=3, feature_windows=[5, 10], n_splits=2, test_size=8,
+        top_k=2, cost_model=_COST,
+        forecaster_factory=lambda: PerfectForecaster(y_all),
+    )
+    base = evaluate_ml(universe, **common)
+    # delist every name early in the OOS span so the haircut lands on real picks
+    events = [DelistingEvent(ticker=t, delisted_known=dt.date(2023, 2, 1))
+              for t in universe]
+    stressed = evaluate_ml(
+        universe, **common, delisting_events=events, delisting_haircut=-0.60
+    )
+    assert stressed["delisting_haircut"] == -0.60
+    assert stressed["n_delisted_in_universe"] == len(universe)
+    assert stressed["ml_mean_net"] < base["ml_mean_net"]
+
+
+def test_survivorship_stress_is_off_by_default_and_reports_zero_delisted():
+    universe = _universe()
+    from signal_trader.strategy.shortterm.dataset import build_dataset
+    _, y_all = build_dataset(universe, horizon=3, feature_windows=[5, 10])
+    res = evaluate_ml(
+        universe, horizon=3, feature_windows=[5, 10], n_splits=2, test_size=8,
+        top_k=2, cost_model=_COST,
+        forecaster_factory=lambda: PerfectForecaster(y_all),
+    )
+    assert res["n_delisted_in_universe"] == 0
+    assert res["delisting_haircut"] is None
+
+
+def test_survivorship_event_for_absent_ticker_is_a_noop():
+    """A delisting record for a name NOT in the universe changes nothing and is
+    not counted — only names that are actually in the (survivor) universe AND on
+    the delisting list can be shaded (the documented partial-correction limit)."""
+    universe = _universe()
+    from signal_trader.strategy.shortterm.dataset import build_dataset
+    _, y_all = build_dataset(universe, horizon=3, feature_windows=[5, 10])
+    common = dict(
+        horizon=3, feature_windows=[5, 10], n_splits=2, test_size=8,
+        top_k=2, cost_model=_COST,
+        forecaster_factory=lambda: PerfectForecaster(y_all),
+    )
+    base = evaluate_ml(universe, **common)
+    stressed = evaluate_ml(
+        universe, **common,
+        delisting_events=[DelistingEvent(ticker="NOT_IN_UNIVERSE",
+                                         delisted_known=dt.date(2023, 2, 1))],
+        delisting_haircut=-1.0,
+    )
+    assert stressed["n_delisted_in_universe"] == 0
+    assert stressed["ml_mean_net"] == base["ml_mean_net"]

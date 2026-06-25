@@ -7,6 +7,7 @@ import pandas as pd
 import scripts.run_ml_experiment as ml
 
 from signal_trader.paper.broker import Fill
+from signal_trader.strategy.shortterm.survivorship import DelistingEvent
 
 
 class FakeBroker:
@@ -96,6 +97,41 @@ def test_no_consensus_flag_does_not_load_signals(tmp_path, monkeypatch, capsys):
                        "--top-k", "2", "--no-trade"]):
         ml.main()
     assert called["yes"] is False  # default OFF: never touches the signal store
+
+
+def test_survivorship_stress_flag_labels_scorecard(tmp_path, monkeypatch, capsys):
+    """--survivorship-stress loads the cached delisting list and prints the FREE
+    synthetic-delisting block with its honest partial-correction caveat."""
+    monkeypatch.setattr(ml, "_load_close_lookup", _universe)
+    monkeypatch.setattr(
+        ml, "_load_delisting_events",
+        lambda tickers: [DelistingEvent(ticker="AAA", delisted_known=dt.date(2023, 6, 1))],
+    )
+    with patch.object(sys, "argv",
+                      ["run_ml_experiment.py", "--tickers", "AAA", "BBB",
+                       "--start", "2023-01-01", "--end", "2024-12-31",
+                       "--horizon", "3", "--n-splits", "2", "--test-size", "10",
+                       "--top-k", "2", "--no-trade",
+                       "--survivorship-stress", "--delisting-haircut", "-0.6"]):
+        ml.main()
+    out = capsys.readouterr().out
+    assert "survivorship stress" in out.lower()
+    assert "1 universe name" in out  # AAA matched
+    assert "needs nico" in out.lower() or "crsp" in out.lower()
+
+
+def test_no_survivorship_flag_does_not_load_delistings(tmp_path, monkeypatch):
+    monkeypatch.setattr(ml, "_load_close_lookup", _universe)
+    called = {"yes": False}
+    monkeypatch.setattr(ml, "_load_delisting_events",
+                        lambda *a, **k: called.__setitem__("yes", True) or [])
+    with patch.object(sys, "argv",
+                      ["run_ml_experiment.py", "--tickers", "AAA", "BBB",
+                       "--start", "2023-01-01", "--end", "2024-12-31",
+                       "--horizon", "3", "--n-splits", "2", "--test-size", "10",
+                       "--top-k", "2", "--no-trade"]):
+        ml.main()
+    assert called["yes"] is False  # default OFF
 
 
 def test_experiment_opens_autonomous_paper_trades(tmp_path, monkeypatch, capsys):
