@@ -180,12 +180,20 @@ purged+embargoed walk-forward, horizon 5, top-k 3, 4 folds → 252 OOS rebalance
 
 **Interpretation (the honest reading — do NOT spin this as an ML edge):** "ML beats
 baseline under stress" is NOT "ML has alpha". Both LOSE money under stress (ML net is
-still negative everywhere). The driver is **baseline fragility**: measured over the
-756 OOS picks, the momentum baseline picks a shaded (fragile) decliner **31.5 %** of
-the time (it chases their momentum spikes), the GBDT only **3.3 %**. So the GBDT is
-structurally less survivorship-fragile than naive momentum — a real, measured finding,
-not an edge claim. (Survivors-only, ML still loses to momentum: the prior honest result
-is unchanged.)
+still negative everywhere). The driver is **baseline fragility**: the momentum baseline
+picks a shaded (fragile) decliner **31.5 %** of the time (it chases their momentum
+spikes), the GBDT only **3.3 %** (−0.60 haircut). So the GBDT is structurally less
+survivorship-fragile than naive momentum — a real, measured finding, not an edge claim.
+(Survivors-only, ML still loses to momentum: the prior honest result is unchanged.)
+These pick rates are emitted by `evaluate_ml` (`ml_shaded_pick_rate` /
+`baseline_shaded_pick_rate`) and printed by the CLI, so the load-bearing figure is
+reproducible from code, not hand-computed.
+
+**Methodology-review fix (folded in):** the shift-test sample is gated on the
+PRE-haircut formed mask — shading changes the lagged values but never which rebalances
+qualify, so a shaded NaN row cannot slip into the leak probe only under stress (which
+would have weakened it in the flattering direction). The measured table above is
+unchanged by the fix.
 
 **Honest limits (documented, not hidden):** PARTIAL & conservative correction — only
 names in BOTH the survivor universe AND the free delisting list can be shaded; the bulk
