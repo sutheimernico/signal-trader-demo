@@ -141,3 +141,55 @@ Momentum baseline: **+0.03399**/rebal (abs PSR 1.000).
   rows), window selection done INSIDE the purged CV, and non-overlapping rebalancing
   (Fix 4) so the absolute numbers become trustworthy too. With today's cache the feature
   is plumbing-validated and leakage-safe, but the A/B is underpowered.
+
+## FREE synthetic-delisting survivorship stress test (2026-06-26, autonomous)
+
+Converts the ML claim from "edge in a bull market" toward "does the result survive
+survivorship scrutiny?" — for free, no paid feed. The earlier `--broad` check
+admitted the universe is still survivors-only (yfinance serves no delisted prices),
+so this is the adversarial complement.
+
+**Mechanism (leakage-safe, opt-in, default OFF — the `--consensus` pattern):**
+- `strategy/shortterm/survivorship.py` — `DelistingEvent(ticker, delisted_known)` +
+  `apply_delisting_haircut(y, events, haircut)`: overwrite the realized forward-return
+  label of any universe name on/after its delisting became KNOWABLE (`delisted_known`,
+  the SEC filing date — never the event date) with a pessimistic haircut. Point-in-time,
+  no lookahead; labels overwritten, never fabricated/dropped; earliest record governs.
+- `market_data/delistings.py` — FREE delisting list from SEC EDGAR full-text search
+  (Form 25-NSE/25; ticker in `display_names`, filing date = knowable date). Offline-first:
+  eval/CLI read a cached CSV (`data/delistings.csv`); `fetch_delistings` is the only
+  network path, behind an injected `http_get` (stdlib urllib in prod, faked in tests —
+  no live SEC call in pytest), SEC fair-access UA mandatory, throttled <10 req/s.
+  `scripts/ingest_delistings.py` refreshes the cache (controller-only, like `sec_smoke.py`).
+- `evaluate_ml(..., delisting_events, delisting_haircut)` shades both the headline and
+  the shift-test's lagged label so they stay coherent; the momentum baseline ranks the
+  SAME shaded labels, so the margin stays a fair A/B. Scorecard carries
+  `n_delisted_in_universe` + `delisting_haircut`. CLI: `--survivorship-stress`
+  `--delisting-haircut`.
+
+**Honest measured result** (local ml_cache, 108 names, 2013–2026, GBDT, SAME
+purged+embargoed walk-forward, horizon 5, top-k 3, 4 folds → 252 OOS rebalances,
+14 real severe decliners shaded point-in-time):
+
+| run | ML net/rebal | baseline net/rebal | diff-PSR | beats baseline? |
+|---|---|---|---|---|
+| survivors-only | +0.00875 | +0.01350 | 0.104 | No |
+| stress −0.40 | −0.01785 | −0.11864 | 1.000 | **Yes** |
+| stress −0.60 | −0.02039 | −0.18161 | 1.000 | **Yes** |
+| stress −1.00 | −0.01264 | −0.30753 | 1.000 | **Yes** |
+
+**Interpretation (the honest reading — do NOT spin this as an ML edge):** "ML beats
+baseline under stress" is NOT "ML has alpha". Both LOSE money under stress (ML net is
+still negative everywhere). The driver is **baseline fragility**: measured over the
+756 OOS picks, the momentum baseline picks a shaded (fragile) decliner **31.5 %** of
+the time (it chases their momentum spikes), the GBDT only **3.3 %**. So the GBDT is
+structurally less survivorship-fragile than naive momentum — a real, measured finding,
+not an edge claim. (Survivors-only, ML still loses to momentum: the prior honest result
+is unchanged.)
+
+**Honest limits (documented, not hidden):** PARTIAL & conservative correction — only
+names in BOTH the survivor universe AND the free delisting list can be shaded; the bulk
+of delisted names are simply absent and unrecoverable without paid delisted prices
+(**CRSP/Sharadar/Norgate — Needs Nico**). Form 25 mixes M&A/voluntary delistings with
+bankruptcy, so a shaded name "left the listing", not "went bankrupt". The haircut is a
+transparent assumption → a sensitivity band (−0.40/−0.60/−1.00), not one magic number.
