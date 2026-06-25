@@ -21,6 +21,7 @@ import pandas as pd
 from signal_trader.strategy.shortterm.survivorship import (
     DelistingEvent,
     apply_delisting_haircut,
+    delisting_mask,
 )
 
 
@@ -90,6 +91,24 @@ def test_total_loss_haircut_is_minus_one():
     y = _label_series({("DEAD", "2024-01-15"): 0.30})
     out = apply_delisting_haircut(y, [_event("DEAD", "2024-01-10")], haircut=-1.0)
     assert out.loc[("DEAD", pd.Timestamp("2024-01-15"))] == -1.0
+
+
+def test_mask_marks_only_decision_bars_on_or_after_delisting():
+    idx = pd.MultiIndex.from_tuples(
+        [("DEAD", pd.Timestamp("2024-01-05")),  # before -> False
+         ("DEAD", pd.Timestamp("2024-01-10")),  # on -> True
+         ("ALIVE", pd.Timestamp("2024-01-10"))],  # other ticker -> False
+        names=["ticker", "date"],
+    )
+    mask = delisting_mask(idx, [_event("DEAD", "2024-01-10")])
+    assert list(mask) == [False, True, False]
+
+
+def test_mask_is_all_false_without_events():
+    idx = pd.MultiIndex.from_tuples(
+        [("DEAD", pd.Timestamp("2024-01-10"))], names=["ticker", "date"]
+    )
+    assert not delisting_mask(idx, []).any()
 
 
 def test_earliest_delisting_wins_for_duplicate_ticker_events():

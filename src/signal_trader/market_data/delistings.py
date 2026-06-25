@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import logging
 import re
 import time
 import urllib.request
@@ -33,6 +34,8 @@ from collections.abc import Callable
 from pathlib import Path
 
 from signal_trader.strategy.shortterm.survivorship import DelistingEvent
+
+_LOG = logging.getLogger(__name__)
 
 __all__ = [
     "DelistingEvent",
@@ -123,6 +126,7 @@ def fetch_delistings(
     headers = {"User-Agent": identity, "Accept": "application/json"}
     forms_param = ",".join(forms)
     by_ticker: dict[str, dt.date] = {}
+    completed = False
     for offset in range(0, max_pages * page_size, page_size):
         url = (
             f"{_FTS_URL}?q=&forms={forms_param}"
@@ -137,9 +141,19 @@ def fetch_delistings(
                 by_ticker[event.ticker] = event.delisted_known
         total = int(hits_block.get("total", {}).get("value", 0))
         if offset + page_size >= total or not page_hits:
+            completed = True
             break
         if http_get is None:
             time.sleep(pause_s)  # real fetch: honour SEC rate limit
+    if not completed:
+        # Hit the page ceiling before exhausting results — the cache is TRUNCATED,
+        # not complete. Surface it loudly so a clipped list isn't mistaken for full.
+        _LOG.warning(
+            "delisting fetch hit max_pages=%d (%d filings) before exhausting "
+            "results for %s..%s — cache is TRUNCATED; raise max_pages or narrow "
+            "the date range",
+            max_pages, max_pages * page_size, start, end,
+        )
     return [
         DelistingEvent(ticker=t, delisted_known=d)
         for t, d in sorted(by_ticker.items())

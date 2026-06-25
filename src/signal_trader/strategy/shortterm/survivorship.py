@@ -52,35 +52,47 @@ class DelistingEvent:
     delisted_known: dt.date
 
 
-def apply_delisting_haircut(
-    y: pd.Series,
-    events: list[DelistingEvent],
-    haircut: float,
-) -> pd.Series:
-    """Overwrite labels with ``haircut`` for ``(ticker, date)`` rows whose
-    decision date is on/after the ticker's earliest knowable delisting.
+def delisting_mask(index: pd.MultiIndex, events: list[DelistingEvent]) -> pd.Series:
+    """Boolean Series over ``index``: True where the DECISION date is on/after the
+    ticker's earliest knowable delisting.
 
-    ``y`` is the forward-return label series indexed by ``(ticker, date)`` (as
-    produced by ``build_dataset``). Returns a NEW series (input never mutated).
-    Rows for tickers without a delisting record are left exactly as-is. When a
-    ticker has several records, the EARLIEST ``delisted_known`` governs — shade
-    as soon as the exit was knowable.
+    The mask anchors on the decision bar ``t`` (the bar the model acts on), not on
+    the label's forward window — a decision strictly before ``delisted_known`` is
+    NOT shaded even if its forward window realizes after the delisting (the
+    conservative direction: shades less, never more). When a ticker has several
+    records, the EARLIEST ``delisted_known`` governs.
     """
-    if not events or len(y) == 0:
-        return y.copy()
-
+    if len(index) == 0 or not events:
+        return pd.Series(False, index=index)
     earliest_known: dict[str, pd.Timestamp] = {}
     for e in events:
         known = pd.Timestamp(e.delisted_known)
         cur = earliest_known.get(e.ticker)
         if cur is None or known < cur:
             earliest_known[e.ticker] = known
-
-    out = y.copy()
-    tickers = out.index.get_level_values("ticker")
-    dates = out.index.get_level_values("date")
-    mask = pd.Series(False, index=out.index)
+    tickers = index.get_level_values("ticker")
+    dates = index.get_level_values("date")
+    mask = pd.Series(False, index=index)
     for ticker, known in earliest_known.items():
         mask |= (tickers == ticker) & (dates >= known)
-    out[mask.to_numpy()] = haircut
+    return mask
+
+
+def apply_delisting_haircut(
+    y: pd.Series,
+    events: list[DelistingEvent],
+    haircut: float,
+) -> pd.Series:
+    """Overwrite labels with ``haircut`` for ``(ticker, date)`` rows whose
+    decision bar is on/after the ticker's earliest knowable delisting.
+
+    ``y`` is the forward-return label series indexed by ``(ticker, date)`` (as
+    produced by ``build_dataset``). Returns a NEW series (input never mutated).
+    Rows for tickers without a delisting record are left exactly as-is. See
+    ``delisting_mask`` for the decision-bar anchoring rule.
+    """
+    if not events or len(y) == 0:
+        return y.copy()
+    out = y.copy()
+    out[delisting_mask(out.index, events).to_numpy()] = haircut
     return out

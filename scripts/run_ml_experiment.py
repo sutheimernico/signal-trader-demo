@@ -177,6 +177,10 @@ def main() -> None:
             f"haircut={res['delisting_haircut']:.2f} applied point-in-time to "
             f"{res['n_delisted_in_universe']} universe name(s) on/after their "
             "SEC-filed delisting.",
+            f"shaded-pick rate: ML {res['ml_shaded_pick_rate']:.1%} vs baseline "
+            f"{res['baseline_shaded_pick_rate']:.1%} — a higher rate means more "
+            "exposure to the fragile (delisted) names; the gap, not absolute "
+            "returns, is what 'beats baseline under stress' actually measures.",
             "PARTIAL & conservative: only names in BOTH the universe AND the free "
             "SEC delisting list can be shaded; a clean test needs paid delisted "
             "prices (CRSP/Sharadar — Needs Nico). Form 25 mixes M&A/voluntary with "

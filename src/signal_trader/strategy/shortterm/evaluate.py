@@ -38,15 +38,12 @@ from signal_trader.strategy.shortterm.model import Forecaster
 from signal_trader.strategy.shortterm.survivorship import (
     DelistingEvent,
     apply_delisting_haircut,
+    delisting_mask,
 )
 
 
 def _top_k_indices(scores: np.ndarray, k: int) -> np.ndarray:
     return np.argsort(scores)[::-1][:k]
-
-
-def _top_k_mean(labels: pd.Series, scores: np.ndarray, k: int) -> float:
-    return float(labels.iloc[_top_k_indices(scores, k)].mean())
 
 
 def _lagged_forward_label(
@@ -133,13 +130,21 @@ def evaluate_ml(
     )
     y_lagged = _lagged_forward_label(close_by_ticker, horizon=horizon, extra_lag=1)
     y_lagged = y_lagged.reindex(X.index)  # align row-for-row; missing -> NaN
+    # Captured BEFORE any haircut: which rebalances have a fully-formed +1-bar
+    # lagged window. The shift-test sample is gated on THIS mask so shading
+    # changes the lagged VALUES but never which rebalances qualify — otherwise a
+    # shaded NaN row would silently enter the sample only under stress and weaken
+    # the leak probe in the flattering direction.
+    lagged_formed = y_lagged.notna()
 
     n_delisted_in_universe = 0
+    shaded_row_mask = pd.Series(False, index=X.index)
     if delisting_events and delisting_haircut is not None:
         universe_tickers = set(X.index.get_level_values("ticker").unique())
         in_universe = [e for e in delisting_events if e.ticker in universe_tickers]
         n_delisted_in_universe = len({e.ticker for e in in_universe})
-        # Shade both labels so the shift-test sees the same stressed picks.
+        shaded_row_mask = delisting_mask(X.index, in_universe)
+        # Shade both labels so the shift-test re-realizes the same stressed picks.
         y = apply_delisting_haircut(y, in_universe, delisting_haircut)
         y_lagged = apply_delisting_haircut(y_lagged, in_universe, delisting_haircut)
     date_level = X.index.get_level_values("date")
@@ -155,9 +160,15 @@ def evaluate_ml(
     base_net: list[float] = []
     # Paired sub-sample for the shift-test: unlagged vs lagged net return of the
     # SAME picks, kept ONLY for rebalances whose +1-bar-lagged forward window is
-    # fully formed — so the two Sharpes are compared over the identical sample.
+    # fully formed (``lagged_formed``, captured pre-haircut) — so the two Sharpes
+    # are compared over the identical sample across stressed and unstressed runs.
     shift_unlagged: list[float] = []
     shift_lagged_net: list[float] = []
+    # Shaded-pick counts: how often each side picks a delisted (shaded) name —
+    # the figure behind the "baseline fragility, not ML edge" reading.
+    n_picks = 0
+    ml_shaded_picks = 0
+    base_shaded_picks = 0
     for train_dates, test_dates in folds:
         train_mask = date_level.isin(train_dates)
         if not train_mask.any():
@@ -171,14 +182,21 @@ def evaluate_ml(
             labels = y.loc[rows.index]
             preds = np.asarray(model.predict(rows), dtype=float)
             picks = _top_k_indices(preds, top_k)
+            base_picks = _top_k_indices(rows[mom_col].to_numpy(), top_k)
             ml = float(labels.iloc[picks].mean())
-            base = _top_k_mean(labels, rows[mom_col].to_numpy(), top_k)
+            base = float(labels.iloc[base_picks].mean())
             ml_gross.append(ml)
             ml_net.append(ml - round_trip)
             base_net.append(base - round_trip)
+            shaded_here = shaded_row_mask.loc[rows.index].to_numpy()
+            n_picks += top_k
+            ml_shaded_picks += int(shaded_here[picks].sum())
+            base_shaded_picks += int(shaded_here[base_picks].sum())
             # Empirical shift-test: the identical picks, re-realized one bar later.
-            lagged = y_lagged.loc[rows.index].iloc[picks]
-            if not lagged.isna().any():
+            # Gate on the PRE-haircut formed mask so shading never changes which
+            # rebalances qualify (only their values).
+            if bool(lagged_formed.loc[rows.index].iloc[picks].all()):
+                lagged = y_lagged.loc[rows.index].iloc[picks]
                 shift_unlagged.append(ml - round_trip)
                 shift_lagged_net.append(float(lagged.mean()) - round_trip)
 
@@ -209,5 +227,9 @@ def evaluate_ml(
         "n_configs_tested": n_configs_tested,
         "delisting_haircut": delisting_haircut,
         "n_delisted_in_universe": n_delisted_in_universe,
+        # Reproducible shaded-pick rates: the load-bearing figure for the honest
+        # "baseline fragility, not ML edge" interpretation under stress.
+        "ml_shaded_pick_rate": (ml_shaded_picks / n_picks) if n_picks else 0.0,
+        "baseline_shaded_pick_rate": (base_shaded_picks / n_picks) if n_picks else 0.0,
         "beat_baseline": bool(ml_mean > base_mean),
     }

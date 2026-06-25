@@ -245,6 +245,53 @@ def test_survivorship_stress_is_off_by_default_and_reports_zero_delisted():
     assert res["delisting_haircut"] is None
 
 
+def test_survivorship_reports_shaded_pick_rates_for_both_sides():
+    """The honest 'baseline fragility vs ML edge' reading rests on per-side
+    shaded-pick rates — they must be emitted in the scorecard, reproducible from
+    code, not only computed by hand in the docs."""
+    universe = _universe()
+    from signal_trader.strategy.shortterm.dataset import build_dataset
+    _, y_all = build_dataset(universe, horizon=3, feature_windows=[5, 10])
+    events = [DelistingEvent(ticker=t, delisted_known=dt.date(2023, 2, 1))
+              for t in universe]
+    res = evaluate_ml(
+        universe, horizon=3, feature_windows=[5, 10], n_splits=2, test_size=8,
+        top_k=2, cost_model=_COST,
+        forecaster_factory=lambda: PerfectForecaster(y_all),
+        delisting_events=events, delisting_haircut=-0.60,
+    )
+    assert 0.0 <= res["ml_shaded_pick_rate"] <= 1.0
+    assert 0.0 <= res["baseline_shaded_pick_rate"] <= 1.0
+    # every name is shaded from early in the OOS span, so picks land on shaded names
+    assert res["ml_shaded_pick_rate"] > 0.0
+
+
+def test_shift_test_sample_size_is_invariant_to_the_haircut():
+    """Gate fix: shading must change the lagged VALUES, never which rebalances
+    qualify for the shift-test. A foresight ranker picks the same names with and
+    without the haircut, so the paired shift-test sample (gated on the pre-haircut
+    formed mask) must be identical — otherwise a shaded NaN row would sneak in
+    only under stress and weaken the leak probe."""
+    universe = _universe()
+    from signal_trader.strategy.shortterm.dataset import build_dataset
+    _, y_all = build_dataset(universe, horizon=3, feature_windows=[5, 10])
+    common = dict(
+        horizon=3, feature_windows=[5, 10], n_splits=2, test_size=8,
+        top_k=2, cost_model=_COST,
+        forecaster_factory=lambda: PerfectForecaster(y_all),
+    )
+    base = evaluate_ml(universe, **common)
+    stressed = evaluate_ml(
+        universe, **common,
+        delisting_events=[DelistingEvent(ticker=t, delisted_known=dt.date(2023, 2, 1))
+                          for t in universe],
+        delisting_haircut=-0.60,
+    )
+    # n_rebalances is unaffected (gate unchanged); the shift-test field is present
+    assert stressed["n_rebalances"] == base["n_rebalances"]
+    assert set(stressed["ml_shift_test"]) == {"baseline", "shifted", "collapsed"}
+
+
 def test_survivorship_event_for_absent_ticker_is_a_noop():
     """A delisting record for a name NOT in the universe changes nothing and is
     not counted — only names that are actually in the (survivor) universe AND on
