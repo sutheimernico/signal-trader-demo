@@ -14,7 +14,7 @@ Lokale, kostenfreie **Paper-Trading-Demo** und Backtest-Harness mit echten Aktie
 Foundation-Report selbst ausführen: `uv run python scripts/backfill.py --tickers AAPL --start 2020-01-01 --end 2024-01-01` dann `uv run python scripts/run_backtest.py --ticker AAPL`.
 
 ## Honest harness — gemessene Artefakte (keine Edge-Behauptung)
-Jede Zahl ist gemessen, nie geschätzt. Die belastbaren Größen sind der **Margin vs. Baseline** (`diff-PSR`, `beats baseline?`) und der **Shift-Test**, nicht die regime-aufgeblähten absoluten PSRs (Bull-Markt, überlappende Horizonte).
+Jede Zahl ist gemessen, nie geschätzt. Die belastbaren Größen sind der **Margin vs. Baseline** (`diff-PSR`, `beats baseline?`) und der **Shift-Test**, nicht die regime-aufgeblähten absoluten PSRs (Bull-Markt, überlappende Horizonte — standardmäßig überlappen die Rebalances, weil jedes Label den vollen Horizont überspannt). Opt-in-Fix: `evaluate_ml(..., non_overlapping=True)` / CLI `--non-overlapping` staffelt die Rebalances um den Horizont, macht die absoluten PSR-/Sharpe-Werte belastbar (weniger Rebalances als Preis). Default bleibt aus — bestehende Zahlen ändern sich nicht ungefragt.
 
 **ML vs. Momentum-Baseline (OOS, nach Kosten):** Ein naiver Preis-Feature-GBDT **schlägt die Momentum-Baseline nicht** robust (`diff-PSR` < 0.5 in allen Armen). Das ist der erwartete, ehrliche Befund — für Retail ist kurzfristiges Alpha realistisch nicht erreichbar. Reported als Lern-Artefakt, nicht versteckt. Details: `docs/superpowers/plans/2026-06-18-phase-4-ml-experiment.md`.
 
