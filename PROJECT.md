@@ -61,7 +61,7 @@ Superpowers-Flow (`brainstorming → writing-plans → executing/subagent-driven
 - **2026-06-17** Repo: Domänen-Layout als `src/`-Package; Doku **committed** (portfolio-Stil).
 
 ## §Open inputs (living — external facts Nico owns)
-- [ ] Alpaca Paper-Account + API-Keys (→ `.env`).
-- [ ] SEC-User-Agent-Kontakt für edgartools (Name + E-Mail).
-- [ ] Optional: Tiingo Free API-Key (Daten-Upgrade).
-- [ ] Git: Remote/Visibility (privat?) — vor erstem Push klären.
+- [x] Alpaca Paper-Account + API-Keys (→ `.env`) — Keys vorhanden (Stand AUTOPILOT_LOG 2026-06-26); der Live-Order-Roundtrip selbst ist bewusst nicht autonom gefeuert (stateful network action) und bleibt unter "Needs Nico" in `AUTOPILOT.md`.
+- [x] SEC-User-Agent-Kontakt für edgartools (Name + E-Mail) — `SEC_IDENTITY` gesetzt (Stand AUTOPILOT_LOG 2026-06-26); der Live-Delisting-Fetch bleibt aus demselben Grund unter "Needs Nico".
+- [ ] Optional: Tiingo Free API-Key (Daten-Upgrade) — weiterhin offen, kein Blocker (yfinance ist der v1-Default).
+- [x] Git: Remote/Visibility — Projekt bleibt lokal, kein Remote (per `AUTOPILOT.md`-Projektregister); keine offene Entscheidung mehr.
