@@ -11,14 +11,26 @@ costs is a finding, not something to hide.
 Cost note: net = gross - 2*(commission+slippage) per pick (round trip). The
 per-rebalance returns are treated as a return series for Sharpe/PSR.
 
-Metric caveat (honest): the rebalances OVERLAP — each label spans the full
-horizon, so consecutive rebalances share calendar days. Annualized Sharpe and
-the ABSOLUTE PSR (`ml_psr`/`baseline_psr`) are therefore OVERSTATED (serial
-correlation, effective sample << n). The only believable figure is the MARGIN
-vs the baseline under the SAME folds/costs: `beat_baseline` and `diff_psr` (PSR
-of the ml_net-base_net difference). Fix 4 (non-overlapping rebalancing) would
-make the absolute numbers trustworthy too; until then, read the margin, not the
-levels.
+Metric caveat (honest): by default the rebalances OVERLAP — each label spans
+the full horizon, so consecutive rebalances share calendar days. Annualized
+Sharpe and the ABSOLUTE PSR (`ml_psr`/`baseline_psr`) are therefore OVERSTATED
+(serial correlation, effective sample << n). The only believable figure in the
+overlapping mode is the MARGIN vs the baseline under the SAME folds/costs:
+`beat_baseline` and `diff_psr` (PSR of the ml_net-base_net difference).
+
+Fix 4 (non-overlapping rebalancing, opt-in via `non_overlapping=True`): stride
+the test dates by `horizon` bars so consecutive rebalances never share a
+holding period. This trades sample size for making the ABSOLUTE numbers
+(`ml_psr`/`baseline_psr`/Sharpe) trustworthy too, at the cost of far fewer
+rebalances per fold (n / horizon instead of n). Default stays OFF (the
+overlapping/margin-only reading) so existing callers and reported figures are
+unchanged unless a caller opts in.
+
+Honest limit on the fix: the stride starts at each fold's first test date
+(offset 0), not a randomized/rotated phase — an arbitrary but deterministic
+choice, applied identically to ML and baseline so the margin stays fair. A
+different phase offset picks a different date subset and could shift the
+absolute levels; this is not stress-tested across offsets.
 """
 from __future__ import annotations
 
@@ -94,6 +106,7 @@ def evaluate_ml(
     n_configs_tested: int = 1,
     delisting_events: list[DelistingEvent] | None = None,
     delisting_haircut: float | None = None,
+    non_overlapping: bool = False,
 ) -> dict:
     """Run purged walk-forward OOS evaluation; return an honest scorecard dict.
 
@@ -120,6 +133,15 @@ def evaluate_ml(
     a fair A/B. ``n_delisted_in_universe`` reports how many universe names were
     actually shaded — only names present in BOTH the universe and the delisting
     list can be (the documented partial-correction limit).
+
+    Non-overlapping rebalancing (opt-in, default OFF — Fix 4): pass
+    ``non_overlapping=True`` to stride each fold's test dates by ``horizon``
+    bars so consecutive rebalances never share a holding period. This makes
+    the ABSOLUTE ``ml_psr``/``baseline_psr``/Sharpe figures trustworthy (no
+    serial correlation from overlapping labels) at the cost of roughly
+    ``horizon``-times fewer rebalances. The baseline and shift-test use the
+    SAME strided dates, so the margin metrics (`diff_psr`, `beat_baseline`)
+    stay comparable across both modes.
     """
     X, y = build_dataset(
         close_by_ticker,
@@ -175,7 +197,12 @@ def evaluate_ml(
             continue
         model = forecaster_factory()
         model.fit(X[train_mask], y[train_mask])
-        for d in test_dates:
+        # Fix 4 (opt-in): stride by `horizon` bars so no two rebalances in this
+        # fold share a holding period — makes the absolute PSR/Sharpe
+        # trustworthy (no overlapping-label serial correlation) at the cost of
+        # fewer rebalances. Off by default (dense/overlapping stays the norm).
+        rebalance_dates = test_dates[::horizon] if non_overlapping else test_dates
+        for d in rebalance_dates:
             rows = X[date_level == d]
             if len(rows) < top_k:
                 continue

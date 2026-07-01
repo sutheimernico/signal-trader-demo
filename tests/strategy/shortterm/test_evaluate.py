@@ -292,6 +292,42 @@ def test_shift_test_sample_size_is_invariant_to_the_haircut():
     assert set(stressed["ml_shift_test"]) == {"baseline", "shifted", "collapsed"}
 
 
+def test_non_overlapping_rebalances_fewer_than_dense_default():
+    """Fix 4, opt-in: striding test dates by `horizon` must yield materially
+    fewer rebalances per fold than the dense (default) mode, since consecutive
+    picks no longer share a holding period."""
+    universe = _universe()
+    from signal_trader.strategy.shortterm.dataset import build_dataset
+    _, y_all = build_dataset(universe, horizon=3, feature_windows=[5, 10])
+    common = dict(
+        horizon=3, feature_windows=[5, 10], n_splits=2, test_size=8,
+        top_k=2, cost_model=_COST,
+        forecaster_factory=lambda: PerfectForecaster(y_all),
+    )
+    dense = evaluate_ml(universe, **common)
+    strided = evaluate_ml(universe, **common, non_overlapping=True)
+    assert strided["n_rebalances"] < dense["n_rebalances"]
+    # roughly n/horizon fewer, not just "one fewer"
+    assert strided["n_rebalances"] <= dense["n_rebalances"] // 2
+
+
+def test_non_overlapping_is_off_by_default():
+    """The default (no flag) must reproduce the dense/overlapping scorecard —
+    existing callers see unchanged numbers unless they opt in."""
+    universe = _universe()
+    from signal_trader.strategy.shortterm.dataset import build_dataset
+    _, y_all = build_dataset(universe, horizon=3, feature_windows=[5, 10])
+    common = dict(
+        horizon=3, feature_windows=[5, 10], n_splits=2, test_size=8,
+        top_k=2, cost_model=_COST,
+        forecaster_factory=lambda: PerfectForecaster(y_all),
+    )
+    default = evaluate_ml(universe, **common)
+    explicit_off = evaluate_ml(universe, **common, non_overlapping=False)
+    assert default["n_rebalances"] == explicit_off["n_rebalances"]
+    assert default["ml_mean_net"] == explicit_off["ml_mean_net"]
+
+
 def test_survivorship_event_for_absent_ticker_is_a_noop():
     """A delisting record for a name NOT in the universe changes nothing and is
     not counted — only names that are actually in the (survivor) universe AND on

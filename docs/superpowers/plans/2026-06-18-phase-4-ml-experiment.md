@@ -127,10 +127,16 @@ Momentum baseline: **+0.03399**/rebal (abs PSR 1.000).
   the underlying signals cluster in **2026-05**. At top-k 3 over 239 names the consensus
   column moves the picks on only a handful of dates, so 84 rebalances over one
   bull-market window is too thin to claim either way.
-- **Overlapping-horizon caveat:** rebalances overlap (each label spans the full horizon,
-  consecutive rebalances share calendar days), so annualized Sharpe and the absolute PSR
-  are overstated (serial correlation, effective n ≪ 84). Fixing this needs non-overlapping
-  rebalancing (Fix 4, M-effort, not done) — until then read the margin, not the levels.
+- **Overlapping-horizon caveat:** rebalances overlap by default (each label spans the full
+  horizon, consecutive rebalances share calendar days), so annualized Sharpe and the
+  absolute PSR are overstated (serial correlation, effective n ≪ 84). **Fix 4 landed
+  2026-07-01** as an opt-in flag (`evaluate_ml(..., non_overlapping=True)`, CLI TBD):
+  strides test dates by `horizon` bars so no two rebalances share a holding period,
+  making the absolute PSR/Sharpe trustworthy at the cost of ~horizon-times fewer
+  rebalances. Default stays OFF (dense/overlapping, margin-only reading unchanged) so
+  existing reported numbers are not silently altered. Honest limit: the stride phase is
+  fixed at each fold's first test date (not randomized/rotated), applied identically to
+  ML and baseline so the margin stays fair, but not stress-tested across phase offsets.
 - **Deflated-Sharpe note (multiple testing):** the +consensus arm was selected over **3
   windows** (30/90/180d); with several configs tested the absolute PSR overstates
   significance. No formal DSR gate is applied (per spec, that is broad-strategy-search
@@ -138,9 +144,10 @@ Momentum baseline: **+0.03399**/rebal (abs PSR 1.000).
   note so the multiple-testing cost is on the record.
 - **What a real test would need (Needs Nico):** a denser, longer point-in-time signal
   history (multi-year Form-4/13F/congress backfill, not the current ~250 mostly-2026
-  rows), window selection done INSIDE the purged CV, and non-overlapping rebalancing
-  (Fix 4) so the absolute numbers become trustworthy too. With today's cache the feature
-  is plumbing-validated and leakage-safe, but the A/B is underpowered.
+  rows) and window selection done INSIDE the purged CV. Non-overlapping rebalancing
+  (Fix 4) is now available (see above) but was not re-run for this consensus A/B — with
+  today's cache the feature is plumbing-validated and leakage-safe, but the A/B remains
+  underpowered regardless of rebalancing mode.
 
 ## FREE synthetic-delisting survivorship stress test (2026-06-26, autonomous)
 

@@ -117,6 +117,13 @@ def main() -> None:
         help="forward-return assigned to a delisted name's picks (e.g. -0.60; "
              "-1.0 = total loss). Transparent assumption — sweep it for a band",
     )
+    parser.add_argument(
+        "--non-overlapping", action="store_true",
+        help="opt in Fix 4 (default OFF): stride rebalances by --horizon bars so "
+             "consecutive picks never share a holding period, making the "
+             "absolute PSR/Sharpe trustworthy (no overlapping-label serial "
+             "correlation) at the cost of ~horizon-times fewer rebalances",
+    )
     args = parser.parse_args()
 
     cost = CostModel(commission_per_trade=args.commission, slippage=args.slippage)
@@ -147,6 +154,7 @@ def main() -> None:
         consensus_window_days=args.consensus_window,
         delisting_events=delisting_events,
         delisting_haircut=delisting_haircut,
+        non_overlapping=args.non_overlapping,
     )
     verdict = "BEAT" if res["beat_baseline"] else "did NOT beat"
     shift = res["ml_shift_test"]
@@ -155,10 +163,16 @@ def main() -> None:
         if shift["collapsed"]
         else "no material collapse"
     )
+    rebalance_mode = (
+        "non-overlapping (Fix 4: absolute PSR/Sharpe trustworthy)"
+        if args.non_overlapping
+        else "overlapping (absolute PSR/Sharpe regime-inflated — read the margin)"
+    )
     lines = [
         "=== ML experiment (OOS, after costs — honest measurement, not edge) ===",
         f"features={feature_mode}",
-        f"rebalances={res['n_rebalances']}  horizon={args.horizon}  top_k={args.top_k}",
+        f"rebalances={res['n_rebalances']}  horizon={args.horizon}  top_k={args.top_k}  "
+        f"mode={rebalance_mode}",
         f"ML       mean net/rebal={res['ml_mean_net']:.4f}  PSR={res['ml_psr']:.3f}",
         f"Baseline mean net/rebal={res['baseline_mean_net']:.4f}  PSR={res['baseline_psr']:.3f}",
         f"=> ML {verdict} the momentum baseline after costs.",
