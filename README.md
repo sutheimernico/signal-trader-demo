@@ -48,8 +48,35 @@ Freie Datenquellen sind nicht sauber. Bewusst behandelt: **Survivorship Bias**, 
 
 **Insider-Verzug (Track 1):** Handelstag + bis zu ~2 Geschäftstage Meldefrist + Polling ⇒ realistisch 2–3 Tage hinterher; Vorveröffentlichungs-Alpha ist nicht verfügbar. `timestamp_known` ist das Filing-Datum und das einzige Datum, das für Trades benutzt wird; `timestamp_event` (Handelstag) wird nur zur Auditierung gespeichert.
 
-## Setup
-Wird in Phase 0 etabliert (Python via `uv`). Externe Zugänge (alle kostenlos): Alpaca Paper-Account, SEC-User-Agent-Kontakt, optional Tiingo. Keys nur via `.env` (nie committen).
+## Setup — Quickstart (verifiziert)
+Voraussetzung: Python ≥3.11 und [`uv`](https://docs.astral.sh/uv/) installiert.
+
+```bash
+git clone <this-repo> && cd signal-trader-demo
+uv sync                     # installiert alle gepinnten Deps aus uv.lock
+```
+
+Kein `.env` nötig für den ersten Backtest-Report — nur yfinance wird kontaktiert (frei, kein Key). `.env` wird erst für Insider-Signale (SEC-User-Agent-Kontakt) und Paper-Trading (Alpaca Paper-Account, kostenlos) gebraucht: `cp .env.example .env` und dort ausfüllen. Optional: Tiingo-Key als Daten-Upgrade.
+
+```bash
+# 1) Kursdaten cachen (schreibt nach data/, gitignored)
+uv run python scripts/backfill.py --tickers AAPL --start 2020-01-01 --end 2024-01-01
+
+# 2) Ersten Backtest-Report erzeugen (beide Engines, nach Kosten, gegen Buy&Hold)
+uv run python scripts/run_backtest.py --ticker AAPL --start 2020-01-01 --end 2024-01-01
+```
+
+Erwartete Ausgabe (Zahlen variieren leicht mit dem yfinance-Datenstand):
+```
+=== Foundation Report (all figures after costs) ===
+
+[backtesting.py] CAGR=0.183 Sharpe=0.894 Sortino=1.365 Calmar=0.690 MaxDD=-0.265 PSR=0.964
+[vectorbt] CAGR=0.146 Sharpe=0.752 Sortino=1.126 Calmar=0.482 MaxDD=-0.303 PSR=0.934
+[Buy & Hold (after costs)] CAGR=0.275 Sharpe=0.891 Sortino=1.316 Calmar=0.874 MaxDD=-0.314 PSR=0.962
+
+Artifact — vectorbt Sharpe minus backtesting.py Sharpe: -0.142 (positive = vectorized looks better than event-driven on the same signals; the realism gap, not an edge).
+```
+Weitere Workflows (Insider-Signale, Dashboard, ML-Experiment, Forward-Paper) siehe unten.
 
 ## Workflows (CLIs)
 Alle paper-only; Live-Kontakt (SEC/Alpaca) braucht Keys in `.env`.
