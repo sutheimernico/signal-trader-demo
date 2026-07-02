@@ -21,7 +21,7 @@ Fünf Schichten: Data → Signal → Strategy → Sim (Backtest + Alpaca Paper) 
 `Signal`, `Suggestion`, `SourceScore`, `PaperTrade`, `PriceBar` — Felder siehe Spec §9. Kernprinzip: jedes Signal mit `timestamp_event` **und** `timestamp_known` + Kurs.
 
 ## 5 · Tech-Stack
-Python · SQLite + Parquet-Cache · yfinance (hinter Provider-Seam, Tiingo-Upgrade später) · vectorbt + backtesting.py · quantstats-reloaded + eigene PSR · alpaca-py (paper) · FastAPI + React 19 (Phase 3) · LightGBM/Qlib (Phase 4). Begründungen: Spec §6.
+Python · SQLite + Parquet-Cache · yfinance (hinter Provider-Seam, Tiingo-Upgrade später) · vectorbt + backtesting.py · quantstats-reloaded + eigene PSR/DSR (Bailey/López de Prado) + PBO/CSCV-Overfitting-Check · matplotlib (self-built HTML-Tearsheet) · alpaca-py (paper) · FastAPI + React 19 (Phase 3) · LightGBM/Qlib (Phase 4). Begründungen: Spec §6.
 
 ## 6 · Acceptance criteria
 1. Kosten + Slippage standardmäßig im Backtest.
