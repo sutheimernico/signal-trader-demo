@@ -7,6 +7,7 @@ metric set (never Sharpe alone).
 """
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 import pandas as pd
@@ -39,14 +40,19 @@ class FoundationReport:
     engine_metrics: dict[str, MetricsReport]
     benchmark_metrics: MetricsReport
     vectorized_minus_event_driven_sharpe: float
+    # Raw per-period returns per engine — lets a caller log this run's Sharpe
+    # to trial_log.py (for an honest DSR) or build a tearsheet, without
+    # re-running the (adapter-heavy) backtest just to get them back.
+    engine_returns: dict[str, pd.Series]
 
     def render(self) -> str:
         lines = ["=== Foundation Report (all figures after costs) ===", ""]
         for engine, m in self.engine_metrics.items():
+            dsr_part = f" DSR={m.dsr:.3f}" if m.dsr is not None else ""
             lines.append(
                 f"[{engine}] CAGR={m.cagr:.3f} Sharpe={m.sharpe:.3f} "
                 f"Sortino={m.sortino:.3f} Calmar={m.calmar:.3f} "
-                f"MaxDD={m.max_drawdown:.3f} PSR={m.psr:.3f}"
+                f"MaxDD={m.max_drawdown:.3f} PSR={m.psr:.3f}{dsr_part}"
             )
         b = self.benchmark_metrics
         lines.append(
@@ -65,17 +71,29 @@ class FoundationReport:
 
 
 def build_foundation_report(
-    close: pd.Series, cost_model: CostModel, lookback: int = 50
+    close: pd.Series,
+    cost_model: CostModel,
+    lookback: int = 50,
+    trial_sharpes: Sequence[float] | None = None,
 ) -> FoundationReport:
+    """Build the foundation report.
+
+    ``trial_sharpes``, when given (see `trial_log.py`), turns on the Deflated
+    Sharpe Ratio for BOTH engines — it corrects for how many configs/tickers
+    have been tried in this comparable search, not for which engine executed
+    a given trial, so the same history applies to both. The benchmark
+    (buy & hold) never gets a DSR: it is not a strategy anyone searched over.
+    """
     event = BacktestingPyAdapter(cost_model).run(
         _ohlcv_from_close(close), lookback=lookback
     )
     vector = VectorbtAdapter(cost_model).run(close, lookback=lookback)
     bench_equity = buy_and_hold_equity(close, cost_model)
 
+    engine_returns = {event.engine: event.returns(), vector.engine: vector.returns()}
     engine_metrics = {
-        event.engine: compute_metrics(event.returns()),
-        vector.engine: compute_metrics(vector.returns()),
+        engine: compute_metrics(returns, trial_sharpes=trial_sharpes)
+        for engine, returns in engine_returns.items()
     }
     benchmark_metrics = compute_metrics(bench_equity.pct_change().dropna())
     gap = engine_metrics["vectorbt"].sharpe - engine_metrics["backtesting.py"].sharpe
@@ -83,4 +101,5 @@ def build_foundation_report(
         engine_metrics=engine_metrics,
         benchmark_metrics=benchmark_metrics,
         vectorized_minus_event_driven_sharpe=gap,
+        engine_returns=engine_returns,
     )
