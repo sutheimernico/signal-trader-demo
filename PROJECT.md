@@ -1,6 +1,6 @@
 # Signal-Trader-Demo — Project (Source of Truth)
 
-**Stand:** 2026-07-01 · **Status:** Phasen 1–4 abgeschlossen (methodisch reviewt, 242 Tests grün, ruff clean); Fortsetzung offen (Alpaca-Live-Smoke, echte SEC-Delisting-Liste — beide Needs Nico; sonst Härtung/Erweiterung nach Bedarf).
+**Stand:** 2026-07-02 · **Status:** Phasen 1–4 abgeschlossen (methodisch reviewt, `pytest` grün, `ruff check .` clean; aktuelle Testanzahl: `uv run pytest --collect-only | tail -1`); Fortsetzung offen (Alpaca-Live-Smoke, echte SEC-Delisting-Liste — beide Needs Nico; sonst Härtung/Erweiterung nach Bedarf).
 Persönliche Regeln (`~/.claude/CLAUDE.md`) gelten. Design-Tiefe & Belege: `docs/superpowers/specs/2026-06-17-signal-trader-demo-design.md`. Arbeitsweise: `CLAUDE.md`. Codebase-Operatives: `AGENTS.md`. Aktueller Stand im Detail: `README.md` (Status-Abschnitt), Phase-Pläne unter `docs/superpowers/plans/`, letzte Iterationsnotizen: `AUTOPILOT_LOG.md`.
 
 ---

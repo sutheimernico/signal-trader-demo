@@ -5,7 +5,7 @@ Lokale, kostenfreie **Paper-Trading-Demo** und Backtest-Harness mit echten Aktie
 > **Kein Anlageprodukt, keine Anlageberatung.** Ausschließlich Paper-Trading, zu Lern- und Engineering-Zwecken. Das Ziel ist ein *ehrliches Mess-Harness*, kein Edge-Versprechen — für Retail ist kurzfristiges Alpha realistisch nicht erreichbar.
 
 ## Status
-**Phasen 1–4 abgeschlossen**, methodisch reviewt, vollständig offline testbar (238 Tests grün, ruff clean; Live-Calls nie im Test):
+**Phasen 1–4 abgeschlossen**, methodisch reviewt, vollständig offline testbar (`pytest` grün, `ruff check .` clean; Live-Calls nie im Test — aktuelle Testanzahl: `uv run pytest --collect-only | tail -1`):
 - **Phase 1 — Fundament:** Daten-Cache, zwei Backtest-Engines (vectorbt + backtesting.py) mit Kosten/Slippage, Momentum-Baseline, Shift-Test/OOS/Walk-forward, Metriken (CAGR/Sharpe/Sortino/Calmar/MaxDD/PSR) gegen Benchmark nach Kosten, Break-even-Check, Alpaca-Paper-Stub.
 - **Phase 2 — Spur 1 (Insider):** SEC Form 4, Filter (opportunistic/Cluster/Small-Cap), point-in-time Signal-Logging, Trefferquoten; 13F + Congress als zusätzliche freie PIT-Quellen.
 - **Phase 3 — Dashboard + Forward-Paper:** FastAPI Read-API, React-19-Dashboard, voller Alpaca-Paper-Loop (Live-Smoke braucht Keys → Needs Nico).
