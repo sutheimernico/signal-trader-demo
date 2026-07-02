@@ -3,7 +3,7 @@
 The "KIT" scoreboard dashboard for the measurement harness. Three views —
 Suggestions, Source Scorecard, Paper Trades — talking to the FastAPI backend.
 Sober by design: it never frames anything as edge; it surfaces data lag and thin
-samples. Ported from the design kit `../signal-trader_v7_kit.html`.
+samples. Ported from the design kit `../docs/design/signal-trader_v7_kit.html`.
 
 ## Run
 
