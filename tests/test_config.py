@@ -1,3 +1,4 @@
+import datetime as dt
 from pathlib import Path
 
 import signal_trader
@@ -6,6 +7,13 @@ from signal_trader import config
 
 def test_package_importable():
     assert signal_trader.__version__ == "0.1.0"
+
+
+def test_default_end_is_todays_date_not_a_stale_constant():
+    # Regression: DEFAULT_END used to be a hard-coded "2026-01-01" that quietly
+    # fell into the past and started truncating every CLI's default --end
+    # window. It must track "today" instead of a fixed string.
+    assert config.DEFAULT_END == dt.date.today().isoformat()
 
 
 def test_config_paths_are_absolute_and_under_repo():

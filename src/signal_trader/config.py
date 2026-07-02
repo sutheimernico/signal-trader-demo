@@ -5,6 +5,7 @@ derived from this file's location so CLI scripts and tests agree.
 """
 from __future__ import annotations
 
+import datetime as dt
 import os
 from pathlib import Path
 
@@ -22,7 +23,15 @@ SP500_SNAPSHOT = CONFIG_DIR / "sp500_snapshot.csv"
 DELISTINGS_CSV = DATA_DIR / "delistings.csv"
 
 DEFAULT_START = "2016-01-01"
-DEFAULT_END = "2026-01-01"
+# Today, not a fixed date: a hard-coded end date silently goes stale (it used
+# to be "2026-01-01", already in the past) and starts truncating every CLI's
+# default `--end` window without warning. PIT-safe by construction — this only
+# widens/narrows the DEFAULT DATA-FETCH window for CLIs that do not pass
+# `--end` explicitly; it never feeds a signal's `timestamp_known`, so it
+# cannot make any backtest see data from its own future. Evaluated once per
+# process (module import time), so a single CLI invocation sees one stable
+# value even if it runs past midnight.
+DEFAULT_END = dt.date.today().isoformat()
 TRADING_DAYS_PER_YEAR = 252
 
 
