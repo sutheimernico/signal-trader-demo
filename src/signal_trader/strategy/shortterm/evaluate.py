@@ -103,7 +103,6 @@ def evaluate_ml(
     embargo: int = 1,
     consensus_signals: list[ConsensusSignal] | None = None,
     consensus_window_days: int = 30,
-    n_configs_tested: int = 1,
     delisting_events: list[DelistingEvent] | None = None,
     delisting_haircut: float | None = None,
     non_overlapping: bool = False,
@@ -121,8 +120,13 @@ def evaluate_ml(
       structural ``max(fit)<min(predict)`` argument with measured evidence.
     - ``diff_psr``: PSR of the per-rebalance difference ``ml_net - base_net``
       against 0 — the only margin metric that is not inflated by the bull-market
-      regime (the absolute ``ml_psr``/``baseline_psr`` are). ``n_configs_tested``
-      is carried through for the deflated-Sharpe / multiple-testing note.
+      regime (the absolute ``ml_psr``/``baseline_psr`` are). The scorecard also
+      returns the raw ``ml_net`` series so a caller can log this run's Sharpe
+      to ``backtest/trial_log.py`` and compute an honest Deflated Sharpe Ratio
+      (``backtest/metrics.deflated_sharpe_ratio``) from the ACTUAL trial
+      history instead of a manually-typed trial count — this replaced the
+      earlier ``n_configs_tested`` parameter, which nothing ever populated
+      truthfully (the CLI always left it at its default of 1).
 
     Survivorship stress (opt-in, default OFF — the ``consensus_signals`` pattern):
     pass ``delisting_events`` + ``delisting_haircut`` to overwrite the realized
@@ -241,6 +245,9 @@ def evaluate_ml(
         "ml_mean_gross": float(np.mean(ml_gross)) if ml_gross else 0.0,
         "ml_mean_net": ml_mean,
         "baseline_mean_net": base_mean,
+        # Raw per-rebalance net returns: lets a caller log this run's Sharpe to
+        # trial_log.py and compute an honest Deflated Sharpe Ratio afterwards.
+        "ml_net": ml_net,
         "ml_psr": probabilistic_sharpe_ratio(ml_series) if n > 2 else 0.0,
         "baseline_psr": probabilistic_sharpe_ratio(base_series) if n > 2 else 0.0,
         # Robust margin: PSR of the ML-minus-baseline difference vs 0. <0.5 means
@@ -251,7 +258,6 @@ def evaluate_ml(
             "shifted": shift_lagged,
             "collapsed": sharpe_collapsed(shift_baseline, shift_lagged),
         },
-        "n_configs_tested": n_configs_tested,
         "delisting_haircut": delisting_haircut,
         "n_delisted_in_universe": n_delisted_in_universe,
         # Reproducible shaded-pick rates: the load-bearing figure for the honest

@@ -150,8 +150,9 @@ def test_scorecard_reports_shift_test_and_diff_psr_fields():
     assert isinstance(res["ml_shift_test"]["collapsed"], bool)
     assert isinstance(res["diff_psr"], float)
     assert 0.0 <= res["diff_psr"] <= 1.0
-    # n_configs_tested is carried for the deflated-Sharpe / multiple-testing note
-    assert res["n_configs_tested"] >= 1
+    # raw net-return series, needed to log this run's Sharpe for an honest DSR
+    assert all(isinstance(x, float) for x in res["ml_net"])
+    assert len(res["ml_net"]) == res["n_rebalances"]
 
 
 def test_shift_test_collapses_for_a_foresight_ranker():
@@ -188,23 +189,6 @@ def test_diff_psr_below_half_when_ml_loses_to_baseline():
     )
     assert res["beat_baseline"] is False
     assert res["diff_psr"] < 0.5
-
-
-def test_n_configs_tested_is_propagated():
-    universe = _universe()
-
-    class ZeroForecaster:
-        def fit(self, X, y):
-            pass
-        def predict(self, X):
-            return np.zeros(len(X))
-
-    res = evaluate_ml(
-        universe, horizon=3, feature_windows=[5, 10], n_splits=2, test_size=8,
-        top_k=2, cost_model=_COST, forecaster_factory=ZeroForecaster,
-        n_configs_tested=3,
-    )
-    assert res["n_configs_tested"] == 3
 
 
 def test_survivorship_stress_shades_a_foresight_ranker_picks():
