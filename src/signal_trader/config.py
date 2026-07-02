@@ -21,6 +21,9 @@ CONFIG_DIR = REPO_ROOT / "config"
 SP500_SNAPSHOT = CONFIG_DIR / "sp500_snapshot.csv"
 # Cached FREE delisting list (SEC Form 25/25-NSE) for the survivorship stress test.
 DELISTINGS_CSV = DATA_DIR / "delistings.csv"
+# Append-only trial history (backtest/trial_log.py) so the Deflated Sharpe
+# Ratio can be computed from the ACTUAL number of configs/strategies tried.
+TRIAL_LOG_PATH = DATA_DIR / "trial_log.jsonl"
 
 DEFAULT_START = "2016-01-01"
 # Today, not a fixed date: a hard-coded end date silently goes stale (it used
