@@ -139,9 +139,23 @@ Momentum baseline: **+0.03399**/rebal (abs PSR 1.000).
   ML and baseline so the margin stays fair, but not stress-tested across phase offsets.
 - **Deflated-Sharpe note (multiple testing):** the +consensus arm was selected over **3
   windows** (30/90/180d); with several configs tested the absolute PSR overstates
-  significance. No formal DSR gate is applied (per spec, that is broad-strategy-search
-  territory) — but `evaluate_ml` now carries `n_configs_tested` and the CLI prints the
-  note so the multiple-testing cost is on the record.
+  significance. At the time, no formal DSR gate was applied — `evaluate_ml` carried a
+  manually-typed `n_configs_tested` that nothing ever actually populated (the CLI always
+  left it at its default of 1, so the printed note was honest about the RISK but not
+  about the REAL count).
+
+  **Landed 2026-07-02:** a full Deflated Sharpe Ratio (Bailey & Lopez de Prado 2014),
+  `backtest/metrics.{expected_max_sharpe,deflated_sharpe_ratio}`, tested against the
+  paper's own worked numeric example (SR=2.5 annualized, Var[SR]=0.5, 100 trials, 1250
+  days, skew=-3, kurtosis=10 -> DSR≈0.8997, independently re-derived from the paper's
+  formula). The manual `n_configs_tested` knob is gone, replaced by
+  `backtest/trial_log.py` — an append-only local log that every `run_backtest.py` /
+  `run_ml_experiment.py` invocation writes one trial to (per-period Sharpe + config
+  label), so DSR is computed from the ACTUAL trial history instead of a guess. Both
+  CLIs now print `DSR=` next to `PSR=` and the real trial count. Simplification, stated
+  rather than hidden: all runs of one CLI share a single trial "family" regardless of
+  which flags were set (e.g. `--consensus` on/off) — a stricter DSR would split
+  families per flag combination.
 - **What a real test would need (Needs Nico):** a denser, longer point-in-time signal
   history (multi-year Form-4/13F/congress backfill, not the current ~250 mostly-2026
   rows) and window selection done INSIDE the purged CV. Non-overlapping rebalancing

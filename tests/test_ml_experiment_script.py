@@ -28,6 +28,7 @@ def _universe(tickers, start, end):
 
 def test_experiment_prints_honest_scorecard_no_trade(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(ml, "_load_close_lookup", _universe)
+    monkeypatch.setattr(ml.config, "TRIAL_LOG_PATH", tmp_path / "trial_log.jsonl")
     with patch.object(sys, "argv",
                       ["run_ml_experiment.py", "--tickers", "AAA", "BBB",
                        "--start", "2023-01-01", "--end", "2024-12-31",
@@ -54,6 +55,7 @@ def test_consensus_flag_loads_signals_and_labels_scorecard(tmp_path, monkeypatch
                                 source="insider_form4", actor_id="x")]
 
     monkeypatch.setattr(ml, "_load_consensus_signals", fake_load_consensus)
+    monkeypatch.setattr(ml.config, "TRIAL_LOG_PATH", tmp_path / "trial_log.jsonl")
     with patch.object(sys, "argv",
                       ["run_ml_experiment.py", "--tickers", "AAA", "BBB",
                        "--start", "2023-01-01", "--end", "2024-12-31",
@@ -90,6 +92,7 @@ def test_no_consensus_flag_does_not_load_signals(tmp_path, monkeypatch, capsys):
     called = {"yes": False}
     monkeypatch.setattr(ml, "_load_consensus_signals",
                         lambda *a, **k: called.__setitem__("yes", True) or [])
+    monkeypatch.setattr(ml.config, "TRIAL_LOG_PATH", tmp_path / "trial_log.jsonl")
     with patch.object(sys, "argv",
                       ["run_ml_experiment.py", "--tickers", "AAA", "BBB",
                        "--start", "2023-01-01", "--end", "2024-12-31",
@@ -107,6 +110,7 @@ def test_survivorship_stress_flag_labels_scorecard(tmp_path, monkeypatch, capsys
         ml, "_load_delisting_events",
         lambda tickers: [DelistingEvent(ticker="AAA", delisted_known=dt.date(2023, 6, 1))],
     )
+    monkeypatch.setattr(ml.config, "TRIAL_LOG_PATH", tmp_path / "trial_log.jsonl")
     with patch.object(sys, "argv",
                       ["run_ml_experiment.py", "--tickers", "AAA", "BBB",
                        "--start", "2023-01-01", "--end", "2024-12-31",
@@ -125,6 +129,7 @@ def test_no_survivorship_flag_does_not_load_delistings(tmp_path, monkeypatch):
     called = {"yes": False}
     monkeypatch.setattr(ml, "_load_delisting_events",
                         lambda *a, **k: called.__setitem__("yes", True) or [])
+    monkeypatch.setattr(ml.config, "TRIAL_LOG_PATH", tmp_path / "trial_log.jsonl")
     with patch.object(sys, "argv",
                       ["run_ml_experiment.py", "--tickers", "AAA", "BBB",
                        "--start", "2023-01-01", "--end", "2024-12-31",
@@ -134,11 +139,33 @@ def test_no_survivorship_flag_does_not_load_delistings(tmp_path, monkeypatch):
     assert called["yes"] is False  # default OFF
 
 
+def test_experiment_logs_trial_and_reports_growing_trial_count(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(ml, "_load_close_lookup", _universe)
+    trial_log = tmp_path / "trial_log.jsonl"
+    monkeypatch.setattr(ml.config, "TRIAL_LOG_PATH", trial_log)
+    argv = ["run_ml_experiment.py", "--tickers", "AAA", "BBB",
+            "--start", "2023-01-01", "--end", "2024-12-31",
+            "--horizon", "3", "--n-splits", "2", "--test-size", "10",
+            "--top-k", "2", "--no-trade"]
+
+    with patch.object(sys, "argv", argv):
+        ml.main()
+    first_out = capsys.readouterr().out
+    assert "1 trial(s) logged" in first_out
+    assert "deflated-Sharpe" in first_out
+
+    with patch.object(sys, "argv", argv):
+        ml.main()
+    second_out = capsys.readouterr().out
+    assert "2 trial(s) logged" in second_out
+
+
 def test_experiment_opens_autonomous_paper_trades(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(ml, "_load_close_lookup", _universe)
     monkeypatch.setattr(ml, "AlpacaPaperBroker", FakeBroker)
     monkeypatch.setattr(ml.config, "SQLITE_PATH", tmp_path / "t.sqlite")
     monkeypatch.setattr(ml.config, "alpaca_credentials", lambda: ("k", "s"))
+    monkeypatch.setattr(ml.config, "TRIAL_LOG_PATH", tmp_path / "trial_log.jsonl")
     with patch.object(sys, "argv",
                       ["run_ml_experiment.py", "--tickers", "AAA",
                        "--start", "2023-01-01", "--end", "2024-12-31",

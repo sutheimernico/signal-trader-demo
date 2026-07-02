@@ -18,6 +18,8 @@ import pandas as pd
 
 from signal_trader import config
 from signal_trader.backtest.costs import CostModel
+from signal_trader.backtest.metrics import deflated_sharpe_ratio, per_period_sharpe
+from signal_trader.backtest.trial_log import load_trial_sharpes, log_trial
 from signal_trader.market_data.delistings import load_delistings_csv
 from signal_trader.market_data.provider import YFinanceProvider
 from signal_trader.paper.alpaca.broker_adapter import AlpacaPaperBroker
@@ -34,6 +36,12 @@ from signal_trader.strategy.shortterm.survivorship import DelistingEvent
 _FEATURE_WINDOWS = [5, 10, 20]
 # Sources persisted by Phase-1/3 ingest; read-only here.
 _CONSENSUS_SOURCES = ("insider_form4", "congress_house", "superinvestor_13f")
+# Trial family for the Deflated Sharpe Ratio (backtest/metrics.py): every run
+# of this CLI counts as one trial in the SAME comparable ML-experiment search,
+# regardless of --consensus/--survivorship-stress/--non-overlapping — a
+# simplification (a stricter DSR would split families per flag combination),
+# documented rather than hidden.
+_TRIAL_FAMILY = "ml_experiment"
 
 
 def _load_close_lookup(tickers: list[str], start: str, end: str) -> dict[str, pd.Series]:
@@ -168,12 +176,31 @@ def main() -> None:
         if args.non_overlapping
         else "overlapping (absolute PSR/Sharpe regime-inflated — read the margin)"
     )
+
+    # Log this run as one trial, then compute the Deflated Sharpe Ratio from
+    # the ACTUAL trial history (backtest/trial_log.py) instead of a manually
+    # typed config count — replaces the earlier n_configs_tested knob, which
+    # this CLI never actually populated (it always defaulted to 1).
+    ml_returns = pd.Series(res["ml_net"], dtype=float)
+    log_trial(
+        config.TRIAL_LOG_PATH,
+        family=_TRIAL_FAMILY,
+        label=f"tickers={len(args.tickers)} horizon={args.horizon} top_k={args.top_k} "
+        f"consensus={args.consensus} survivorship_stress={args.survivorship_stress} "
+        f"non_overlapping={args.non_overlapping}",
+        sharpe=per_period_sharpe(ml_returns),
+        n_obs=res["n_rebalances"],
+    )
+    trial_sharpes = load_trial_sharpes(config.TRIAL_LOG_PATH, family=_TRIAL_FAMILY)
+    ml_dsr = deflated_sharpe_ratio(ml_returns, trial_sharpes) if res["n_rebalances"] > 2 else None
+    dsr_part = f"  DSR={ml_dsr:.3f}" if ml_dsr is not None else ""
+
     lines = [
         "=== ML experiment (OOS, after costs — honest measurement, not edge) ===",
         f"features={feature_mode}",
         f"rebalances={res['n_rebalances']}  horizon={args.horizon}  top_k={args.top_k}  "
         f"mode={rebalance_mode}",
-        f"ML       mean net/rebal={res['ml_mean_net']:.4f}  PSR={res['ml_psr']:.3f}",
+        f"ML       mean net/rebal={res['ml_mean_net']:.4f}  PSR={res['ml_psr']:.3f}{dsr_part}",
         f"Baseline mean net/rebal={res['baseline_mean_net']:.4f}  PSR={res['baseline_psr']:.3f}",
         f"=> ML {verdict} the momentum baseline after costs.",
         "--- honesty checks (the only believable figures) ---",
@@ -181,9 +208,10 @@ def main() -> None:
         "(>0.5 = ML robustly ahead; absolute PSR above is regime-inflated)",
         f"shift-test (ML picks, +1 bar): Sharpe {shift['baseline']:.2f} -> "
         f"{shift['shifted']:.2f}  [{collapse_note}]",
-        f"deflated-Sharpe note: {res['n_configs_tested']} configuration(s) tested; "
-        "with multiple windows/configs the absolute PSR overstates significance "
-        "(no formal DSR gate — broad-search territory).",
+        f"deflated-Sharpe: {len(trial_sharpes)} trial(s) logged for "
+        f"'{_TRIAL_FAMILY}' so far ({config.TRIAL_LOG_PATH}); with multiple "
+        "windows/configs the absolute PSR overstates significance — DSR above "
+        "corrects for it (Bailey & Lopez de Prado 2014).",
     ]
     if args.survivorship_stress:
         lines += [
