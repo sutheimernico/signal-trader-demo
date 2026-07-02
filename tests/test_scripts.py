@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 import pandas as pd
 import scripts.backfill as backfill  # noqa: E402
+import scripts.generate_tearsheet as generate_tearsheet  # noqa: E402
 import scripts.run_backtest as run_backtest  # noqa: E402
 
 
@@ -64,3 +65,25 @@ def test_run_backtest_logs_trial_and_reports_growing_trial_count(tmp_path, monke
         run_backtest.main()
     second_out = capsys.readouterr().out
     assert "2 trial(s) logged" in second_out
+
+
+def test_generate_tearsheet_main_writes_html_report(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(generate_tearsheet, "YFinanceProvider", FakeProvider)
+    monkeypatch.setattr(generate_tearsheet.config, "PARQUET_DIR", tmp_path / "bars")
+    monkeypatch.setattr(generate_tearsheet.config, "SQLITE_PATH", tmp_path / "t.sqlite")
+    monkeypatch.setattr(generate_tearsheet.config, "TRIAL_LOG_PATH", tmp_path / "trial_log.jsonl")
+    output_path = tmp_path / "out" / "aapl_tearsheet.html"
+    with patch.object(
+        sys, "argv",
+        ["generate_tearsheet.py", "--ticker", "AAPL", "--lookback", "50",
+         "--start", "2018-01-01", "--end", "2019-12-31", "--output", str(output_path)],
+    ):
+        generate_tearsheet.main()
+    out = capsys.readouterr().out
+    assert "Wrote tearsheet" in out
+    assert output_path.exists()
+
+    html = output_path.read_text(encoding="utf-8")
+    assert "data:image/png;base64," in html
+    assert "does NOT robustly beat the momentum baseline" in html  # honest note present
+    assert "http://" not in html and "https://" not in html

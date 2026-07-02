@@ -94,6 +94,17 @@ uv run python scripts/run_forward_paper.py --hold-days 5
 
 # Dashboard-Backend serven (Read-API; das React-Frontend spricht hiermit)
 uv run python scripts/run_api.py --port 8000
+
+# HTML-Tearsheet für einen Beispiel-Backtest (Equity Curve, Drawdown,
+# Monats-Heatmap, PSR/DSR, Kosten-Ausweis) — schreibt nach reports/, gitignored
+uv run python scripts/generate_tearsheet.py --ticker AAPL --start 2020-01-01 --end 2024-01-01
 ```
 
 Das Dashboard (React, Phase 3) wird gegen die Read-API gebaut; Design-Brief: `docs/design/2026-06-18-dashboard-design-brief.md`.
+
+## Tearsheet
+`scripts/generate_tearsheet.py` baut ein eigenständiges HTML-Tearsheet für den Foundation-Backtest (vectorbt-Engine): Equity Curve gegen Buy&Hold, Drawdown, Monats-Renditen-Heatmap, die volle ehrliche Kennzahlen-Reihe (CAGR/Sharpe/Sortino/Calmar/MaxDD/PSR/DSR) und ein Kosten-Ausweis (Commission/Slippage). Selbstständig (keine externen CDNs/Fonts, Charts als Base64-PNG eingebettet) — Datei direkt im Browser öffnen, kein Server nötig. Ergebnis liegt in `reports/` (gitignored, wie `data/` — per Befehl neu erzeugbar).
+
+`quantstats-reloaded`s eigener `reports.html()` war die naheliegende erste Wahl (bereits gepinnte Dependency, wird in `metrics.py` genutzt) — dessen `reports`-Modul ist aber inkompatibel mit der gepinnten pandas-Version (`ValueError` in jedem Modus, reproduzierbar mit synthetischen Daten, unabhängig vom Input). Das eigene Tearsheet baut dieselben Inhalte direkt mit `matplotlib` (bereits transitive Dependency über `quantstats-reloaded`, hier zur direkten Nutzung explizit gepinnt).
+
+Ehrlichkeits-Hinweis: Das Tearsheet zeigt immer denselben Satz nüchterner Hinweise (u. a. dass das separate ML-Experiment die Momentum-Baseline OOS nicht robust schlägt) — unabhängig davon, wie der gezeigte Einzel-Ticker-Lauf performt hat.

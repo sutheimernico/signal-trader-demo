@@ -10,6 +10,9 @@
 *.db
 *.parquet
 
+# Generated reports (regenerate via scripts/generate_tearsheet.py)
+/reports/
+
 # Python
 __pycache__/
 *.py[cod]
