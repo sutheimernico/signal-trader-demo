@@ -9,6 +9,7 @@ dependencies = [
     "edgartools==5.36.0",
     "vectorbt==1.0.0",
     "quantstats-reloaded==0.1.0",
+    "matplotlib==3.11.0",
     "alpaca-py==0.43.4",
     "pandas>=2.2,<3",
     "numpy>=1.26,<3",
