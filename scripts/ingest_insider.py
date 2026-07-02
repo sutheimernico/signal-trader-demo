@@ -55,7 +55,7 @@ def main() -> None:
             )
             total += n
             print(f"  {ticker}: +{n} signal(s)  (running total {total})", flush=True)
-        except Exception as exc:  # noqa: BLE001 - log + skip, continue the basket
+        except Exception as exc:  # log + skip, continue the basket
             print(f"  {ticker}: SKIPPED ({exc})", flush=True)
     print(f"Persisted {total} insider signal(s) into {config.SQLITE_PATH}")
 

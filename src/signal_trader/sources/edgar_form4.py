@@ -85,7 +85,7 @@ class EdgarForm4Source:
             for filing in filings:
                 try:
                     observations.extend(self._observations_from_filing(ticker, filing))
-                except Exception as exc:  # noqa: BLE001 - log + skip, never truncate silently
+                except Exception as exc:  # log + skip, never truncate silently
                     _LOG.warning(
                         "skip unparseable Form 4 %s for %s: %s",
                         getattr(filing, "accession_no", "?"),
@@ -138,7 +138,7 @@ class EdgarForm4Source:
                 observations.extend(
                     o for o in self._observations_from_filing("", filing) if o.ticker
                 )
-            except Exception as exc:  # noqa: BLE001 - log + skip, never truncate silently
+            except Exception as exc:  # log + skip, never truncate silently
                 _LOG.warning(
                     "skip unparseable Form 4 %s: %s",
                     getattr(filing, "accession_no", "?"), exc,

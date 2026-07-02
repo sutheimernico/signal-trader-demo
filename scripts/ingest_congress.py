@@ -32,7 +32,7 @@ def _load_close_lookup(tickers: list[str], start: str, end: str) -> dict[str, pd
             wide = service.load_close_matrix([t], start, end)
             if t in wide:
                 out[t] = wide[t].dropna()
-        except Exception:  # noqa: BLE001
+        except Exception:  # no price data/history for this name; skip it
             continue
     return out
 

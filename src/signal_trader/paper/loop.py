@@ -53,7 +53,7 @@ def open_accepted_suggestions(
                 pnl=None,
                 source_suggestion_id=sid,
             ))
-        except Exception as exc:  # noqa: BLE001 - log + skip, continue the loop
+        except Exception as exc:  # log + skip, continue the loop
             _LOG.warning("skip paper-open for %s: %s", sid, exc)
             continue
         already_traded.add(sid)
@@ -87,7 +87,7 @@ def close_due_trades(
                 trade.id, exit_price=fill.price,
                 exit_time=fill.filled_at, pnl=pnl,
             )
-        except Exception as exc:  # noqa: BLE001 - log + skip, continue the loop
+        except Exception as exc:  # log + skip, continue the loop
             _LOG.warning("skip paper-close for trade %s: %s", trade.id, exc)
             continue
         closed += 1

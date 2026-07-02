@@ -48,7 +48,7 @@ def open_ml_positions(
                 exit_price=None, exit_time=None, pnl=None,
                 source_suggestion_id=sid,
             ))
-        except Exception as exc:  # noqa: BLE001 - log + skip, continue
+        except Exception as exc:  # log + skip, continue
             _LOG.warning("skip ML paper-open for %s: %s", sid, exc)
             continue
         already.add(sid)

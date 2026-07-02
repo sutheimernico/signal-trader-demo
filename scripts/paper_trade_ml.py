@@ -35,7 +35,7 @@ def _load(cache: CacheService, tickers: list[str], start: str, end: str) -> dict
             wide = cache.load_close_matrix([t], start, end)
             if t in wide and len(wide[t].dropna()) > 300:
                 out[t] = wide[t].dropna()
-        except Exception:  # noqa: BLE001 - skip names without history
+        except Exception:  # skip names without history
             continue
     return out
 

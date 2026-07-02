@@ -54,7 +54,7 @@ def _load(cache: CacheService, tickers, start, end) -> dict[str, pd.Series]:
                 s = wide[t].dropna()
                 if len(s) > 300:
                     out[t] = s
-        except Exception:  # noqa: BLE001 - skip names with no/short history
+        except Exception:  # skip names with no/short history
             continue
     return out
 

@@ -117,7 +117,7 @@ class CongressTradesSource:
                 xml = z.read(next(n for n in z.namelist() if n.endswith(".xml"))).decode(
                     "utf-8", "ignore"
                 )
-            except Exception as exc:  # noqa: BLE001 - whole-year fetch failed; skip
+            except Exception as exc:  # whole-year fetch failed; skip
                 _LOG.warning("congress: %sFD.zip failed: %s", yr, exc)
                 continue
             ptrs = parse_fd_xml(xml)
@@ -136,7 +136,7 @@ class CongressTradesSource:
             text = "\n".join(
                 p.extract_text() or "" for p in PdfReader(io.BytesIO(self._get(url))).pages
             )
-        except Exception as exc:  # noqa: BLE001 - scanned/unparseable PTR; log + skip
+        except Exception as exc:  # scanned/unparseable PTR; log + skip
             _LOG.warning("congress: skip PTR %s (%s)", doc, exc)
             return []
         obs: list[CongressObservation] = []
@@ -149,6 +149,6 @@ class CongressTradesSource:
                     member=ptr["member"], ticker=row["ticker"], transaction_date=tdate,
                     timestamp_known=known, amount="", url=url, doc_id=doc,
                 ))
-            except Exception:  # noqa: BLE001 - bad row; skip
+            except Exception:  # bad row; skip
                 continue
         return obs

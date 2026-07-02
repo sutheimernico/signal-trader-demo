@@ -95,7 +95,7 @@ class ThirteenFSource:
                 continue
             try:
                 out.extend(self._new_positions_for_fund(name, cik))
-            except Exception as exc:  # noqa: BLE001 - log + skip, never abort the roster
+            except Exception as exc:  # log + skip, never abort the roster
                 _LOG.warning("skip 13F for %s: %s", name, exc)
         return out
 
