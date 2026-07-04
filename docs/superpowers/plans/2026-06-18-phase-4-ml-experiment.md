@@ -6,7 +6,7 @@
 
 An **autonomous** ML experiment that runs in the **paper** track (no human confirmation): from the cached point-in-time price bars, build leakage-safe features + forward-return labels, train a GBDT, evaluate under purged/embargoed walk-forward **after costs against the momentum baseline**, and — only if it clears that bar honestly — let it place paper orders by itself. It is a measurement experiment, never an edge claim; a model that fails to beat the baseline is reported as such, not hidden.
 
-Separation from Track 1 (locked with Nico, 2026-06-18): **Insider suggestions = human-facing**, acting on them is a manual user decision outside the app; the app never executes real orders. **ML = automated paper only.** The two never cross.
+Separation from Track 1 (locked with Nico, 2026-06-18): **Insider suggestions = human-facing** — whether and how to act on them is a manual user decision entirely outside the app; the app never executes real orders. **ML = automated paper only.** The two never cross.
 
 ## Hard guardrails (non-negotiable)
 
