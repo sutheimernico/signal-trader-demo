@@ -4,7 +4,7 @@ You are a fresh headless agent. You do ONE high-value thing, verify it, commit i
 Progress lives on disk (this file, `PROJECT.md`, git history, `AUTOPILOT_LOG.md`) — never in context.
 
 ## Per-iteration protocol
-1. Read `~/private/AUTOPILOT.md` (global rules), then this `LOOP.md`, then `PROJECT.md`.
+1. Read the global autopilot rules (`AUTOPILOT.md`, kept privately outside this repo), then this `LOOP.md`, then `PROJECT.md`.
 2. Confirm you are on branch `autopilot/work` (the runner guarantees this; if not, stop).
 3. **First iteration only:** `PROJECT.md`'s status header is stale (still says "Phase 0 →
    Phase 1", dated 2026-06-17) while branch history shows work far beyond that (insider
